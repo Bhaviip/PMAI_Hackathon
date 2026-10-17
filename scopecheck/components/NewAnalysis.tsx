@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { CodeChange, ProjectFile } from "@/fixtures/codeChangeDemo";
 import { analyze } from "@/lib/analyze";
 import { runAiReview } from "@/lib/aiReview";
@@ -18,7 +18,10 @@ export function NewAnalysis({ onDone }: { onDone: (a: Analysis) => void }) {
   return (
     <section className="rounded-lg bg-card p-5 border border-line sm:p-6">
       <h1 className="font-serif text-[34px] font-semibold leading-tight tracking-tight">Analyze your code</h1>
-      <p className="mt-1 text-sm text-muted">Files stay in your browser. Nothing is uploaded to a server.</p>
+      <p className="mt-1 text-sm text-muted">
+        Files stay in your browser. With the AI check on, only the change and short excerpts of the flagged files go to the model.
+      </p>
+      <AiStatus />
       <div className="mt-5 inline-flex rounded-lg bg-paper p-1" role="tablist">
         {(
           [
@@ -246,6 +249,30 @@ function GithubFlow({ onDone }: { onDone: (a: Analysis) => void }) {
         </p>
       </Step>
     </div>
+  );
+}
+
+// Shows up front whether results will be AI-checked, so nobody has to run an
+// analysis to find out. Reads GET /api/review, which never calls the model.
+function AiStatus() {
+  const [status, setStatus] = useState<{ configured: boolean; model?: string } | null>(null);
+  useEffect(() => {
+    fetch("/api/review")
+      .then((r) => r.json())
+      .then(setStatus)
+      .catch(() => setStatus({ configured: false }));
+  }, []);
+  if (!status) return null;
+  return status.configured ? (
+    <p className="mt-3 inline-flex items-center gap-2 rounded-md bg-moss-50 px-3 py-1.5 text-sm text-moss">
+      <span className="h-2 w-2 rounded-full bg-moss" aria-hidden />
+      AI check on · {status.model}. A keyword scan finds candidate files, then the model judges each one.
+    </p>
+  ) : (
+    <p className="mt-3 inline-flex items-center gap-2 rounded-md bg-ochre-50 px-3 py-1.5 text-sm text-ochre">
+      <span className="h-2 w-2 rounded-full bg-ochre" aria-hidden />
+      AI check off: no AI key on the server. Results will be keyword matches only.
+    </p>
   );
 }
 

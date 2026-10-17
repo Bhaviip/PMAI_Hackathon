@@ -113,7 +113,7 @@ export default function Home() {
             Analyze your code →
           </button>
           {mine.length > 0 && <ChangeList title="Your changes" items={mine} activeId={changeId} onPick={show} />}
-          <ChangeList title="Sample pull requests" items={samples} activeId={changeId} onPick={show} />
+          <ChangeList title="Samples · hand-written, no AI" items={samples} activeId={changeId} onPick={show} />
         </aside>
 
         <main className="min-w-0">
