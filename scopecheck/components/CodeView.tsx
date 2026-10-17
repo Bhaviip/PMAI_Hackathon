@@ -1,8 +1,15 @@
-// Read-only code listing with line numbers; evidence lines are marked. Rendered as text.
+const CONTEXT = 4;
+const SHORT_FILE = 30;
+
+// Read-only code listing with line numbers; evidence lines are marked. Long files
+// show only the lines around the evidence. Rendered as text.
 export function CodeView({ lines, highlight }: { lines: string[]; highlight: Set<number> }) {
+  const near = (n: number) => [...highlight].some((h) => Math.abs(h - n) <= CONTEXT);
+  const visible = lines.map((_, i) => lines.length <= SHORT_FILE || near(i + 1));
   return (
-    <pre className="overflow-x-auto rounded-xl border border-slate-200 bg-slate-50/60 py-2 font-mono text-[12.5px] leading-6">
+    <pre className="max-h-[480px] overflow-y-auto rounded-xl border border-slate-200 bg-slate-50/60 py-2 font-mono text-[12.5px] leading-6">
       {lines.map((l, i) => {
+        if (!visible[i]) return i > 0 && visible[i - 1] ? <div key={i} className="px-10 text-slate-300">⋯</div> : null;
         const on = highlight.has(i + 1);
         return (
           <div
@@ -12,7 +19,7 @@ export function CodeView({ lines, highlight }: { lines: string[]; highlight: Set
             <span className={`w-10 shrink-0 select-none pr-3 text-right ${on ? "font-semibold text-indigo-600" : "text-slate-300"}`}>
               {i + 1}
             </span>
-            <span className="whitespace-pre pr-4">{l || " "}</span>
+            <span className="min-w-0 whitespace-pre-wrap pr-4 [overflow-wrap:anywhere]">{l || " "}</span>
           </div>
         );
       })}

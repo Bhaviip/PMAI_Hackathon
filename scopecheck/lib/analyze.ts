@@ -34,6 +34,12 @@ const literals = (line: string) =>
 const definitions = (line: string) =>
   [...line.matchAll(/\b(?:function|class|const|let|var|def|type|interface|enum)\s+([A-Za-z_$][\w$]*)/g)].map((m) => m[1]);
 
+const COMMENT_RE = /^\s*(\/\/|#|\*|\/\*|<!--|--\s)/;
+// camelCase, snake_case, PascalCase with an inner capital, or containing a digit.
+const codeLike = (w: string) => /[a-z][A-Z]|_|[A-Za-z]\d|^[A-Z][a-z]+[A-Z]/.test(w);
+
+const DATA_RE = /\.(json|ya?ml|toml|txt|csv)$/i;
+
 const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 type Signal = { token: string; strength: "removed" | "defined" | "literal" | "used" };
@@ -46,12 +52,22 @@ function signalsFor(edit: Edit): Signal[] {
   const afterText = edit.after;
   const out = new Map<string, Signal["strength"]>();
   const put = (token: string, strength: Signal["strength"]) => {
-    if (STOP.has(token.toLowerCase())) return;
+    if (token.length < 3 || STOP.has(token.toLowerCase())) return;
     const rank = { removed: 3, defined: 2, literal: 1, used: 0 };
     const prev = out.get(token);
     if (!prev || rank[strength] > rank[prev]) out.set(token, strength);
   };
+  // Prose (docs, comments) only contributes names that look like code, e.g. canSend or approval_id.
+  const prose = kindOf(edit.path) === "doc";
   for (const d of changed) {
+    const comment = prose || COMMENT_RE.test(d.text);
+    if (comment) {
+      for (const w of words(d.text).filter(codeLike)) {
+        const gone = d.type === "del" && !new RegExp(`\\b${escape(w)}\\b`).test(afterText);
+        put(w, gone ? "removed" : "used");
+      }
+      continue;
+    }
     for (const def of definitions(d.text)) put(def, "defined");
     for (const lit of literals(d.text)) {
       // An old value that no longer appears as a whole value is a removal: anything still using it is stale.
@@ -60,9 +76,10 @@ function signalsFor(edit: Edit): Signal[] {
     }
     for (const w of words(d.text)) {
       const gone = d.type === "del" && !new RegExp(`\\b${escape(w)}\\b`).test(afterText);
-      put(w, gone ? "removed" : "used");
+      if (gone || codeLike(w)) put(w, gone ? "removed" : "used");
     }
   }
+  if (prose) return [...out].map(([token, strength]) => ({ token, strength }));
   // The function or class that contains a changed line has changed behavior, so its callers matter.
   for (const name of enclosingDefinitions(diff)) put(name, "defined");
   return [...out].map(([token, strength]) => ({ token, strength }));
@@ -130,28 +147,41 @@ export function analyze(input: {
 }): CodeChange {
   const editedPaths = new Set(input.edits.map((e) => e.path));
   const others = input.files.filter((f) => !editedPaths.has(f.path));
-  let signals = input.edits.flatMap(signalsFor);
+  // One signal per name across all edited files, keeping its strongest reading.
+  const best = new Map<string, Signal>();
+  const strength = { removed: 3, defined: 2, literal: 1, used: 0 };
+  // A brand-new file can't make existing files stale, so only edits to existing files count.
+  for (const sig of input.edits.filter((e) => e.before !== "").flatMap(signalsFor)) {
+    const prev = best.get(sig.token);
+    if (!prev || strength[sig.strength] > strength[prev.strength]) best.set(sig.token, sig);
+  }
+  let signals = [...best.values()];
 
   // Whole-token match; also works for values with spaces or symbols, like "Approve & send".
   const matcher = (token: string) => new RegExp(`(^|[^\\w$])${escape(token)}([^\\w$]|$)`, "m");
 
   // Names that appear in most files carry no information about this change.
   const spread = (token: string) => others.filter((f) => matcher(token).test(f.code)).length;
-  const limit = Math.max(3, Math.ceil(others.length * 0.4));
+  // Removed or redefined names always count, however widely they are used.
+  const cap = { removed: Infinity, defined: Infinity, literal: 0.4, used: 0.15 };
   signals = signals.filter((s) => {
     const n = spread(s.token);
-    return n > 0 && (s.strength !== "used" || n <= Math.max(2, Math.ceil(others.length * 0.15))) && n <= limit;
+    return n > 0 && n <= Math.max(2, Math.ceil(others.length * cap[s.strength]));
   });
 
-  const rank = { removed: 3, defined: 2, literal: 1, used: 0 };
-  signals.sort((a, b) => rank[b.strength] - rank[a.strength]);
+  signals.sort((a, b) => strength[b.strength] - strength[a.strength]);
+  // Old string values (like a button label) are worth finding even in docs.
+  const isOldValue = new Set(input.edits.flatMap((e) => e.before.split("\n").flatMap(literals)));
 
   const impacts: Impact[] = [];
   for (const f of others) {
     const lines = f.code.split("\n");
     const hits: Signal[] = [];
     const evidence: string[] = [];
+    // Docs and data files are prose or keys: plain words there are coincidences, not references.
+    const plainText = f.kind === "doc" || DATA_RE.test(f.path);
     for (const s of signals) {
+      if (plainText && !codeLike(s.token) && !(s.strength === "removed" && isOldValue.has(s.token))) continue;
       const re = matcher(s.token);
       // Prefer a line that uses the name over the line that imports it.
       const line =

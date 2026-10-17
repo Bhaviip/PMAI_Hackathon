@@ -110,12 +110,32 @@ export async function readPullRequest(
   }
   if (!edits.length) throw new Error("This pull request doesn't change any text files ScopeCheck can read.");
 
-  const firstLine = (info.body ?? "").split("\n").find((l) => l.trim() && !l.startsWith("<!--"))?.trim();
+  const fallback = `${edits.length} file${edits.length === 1 ? "" : "s"} changed in ${ref.owner}/${ref.repo}.`;
   return {
     title: info.title,
-    summary: firstLine && firstLine.length < 240 ? firstLine : `${edits.length} file${edits.length === 1 ? "" : "s"} changed in ${ref.owner}/${ref.repo}.`,
+    summary: summarize(info.body) ?? fallback,
     pr: { repo: `${ref.owner}/${ref.repo}`, number: ref.number, author: info.user.login, branch: info.head.ref, base: info.base.ref },
     files,
     edits,
   };
+}
+
+// First real sentence of a pull request description, as plain text. Skips
+// comments, headings, tables, images and lines in italics (often bot or template notes).
+export function summarize(body: string | null): string | null {
+  const plain = (l: string) =>
+    l
+      .replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1")
+      .replace(/<[^>]+>/g, "")
+      .replace(/(\*\*|__|`)/g, "")
+      .replace(/^\s*([-*+]|\d+\.)\s+/, "")
+      .trim();
+  for (const raw of (body ?? "").replace(/<!--[\s\S]*?-->/g, "").split("\n")) {
+    const l = raw.trim();
+    if (!l || /^(#|\||!\[|>|_|```|---)/.test(l) || /🤖|https:\/\/claude\.ai/.test(l)) continue;
+    const text = plain(l);
+    if (text.length < 12) continue;
+    return text.length > 220 ? `${text.slice(0, 217)}…` : text;
+  }
+  return null;
 }

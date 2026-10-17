@@ -85,7 +85,7 @@ export default function Home() {
       </header>
 
       <div className="mx-auto grid max-w-[1400px] gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[260px_minmax(0,1fr)]">
-        <aside className="min-w-0">
+        <aside className="min-w-0 lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:self-start lg:overflow-y-auto lg:pb-4">
           <button
             type="button"
             onClick={() => setChangeId(null)}
@@ -179,6 +179,30 @@ export default function Home() {
                   Nothing else in the project uses the names or values this change touches.
                 </div>
               )}
+              {impacts.length > 0 && (
+                <ul className="mt-4 max-h-64 divide-y divide-slate-100 overflow-y-auto rounded-xl border border-slate-200">
+                  {impacts
+                    .filter((i) => !focusLevel || i.level === focusLevel)
+                    .map((i) => (
+                      <li key={i.path}>
+                        <button
+                          type="button"
+                          onClick={() => setSelected(i.path)}
+                          aria-pressed={i.path === selected}
+                          className={`flex w-full items-center gap-3 px-3 py-2 text-left text-sm ${
+                            i.path === selected ? "bg-indigo-50" : "hover:bg-slate-50"
+                          }`}
+                        >
+                          <span className={`h-2 w-2 shrink-0 rounded-full ${LEVELS[i.level].dot}`} />
+                          <span className="w-24 shrink-0 text-xs font-medium text-slate-500">{LEVELS[i.level].label}</span>
+                          <span className="min-w-0 truncate font-mono text-xs text-slate-800" title={i.path}>
+                            {i.path}
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                </ul>
+              )}
             </section>
 
             {impact && (
@@ -229,18 +253,18 @@ export default function Home() {
 }
 
 function Verdict({ breaks, touched }: { breaks: number; touched: number }) {
-  const risky = breaks > 0;
+  const plural = (n: number) => `${n} file${n === 1 ? "" : "s"}`;
+  const v =
+    breaks > 0
+      ? { tone: "bg-rose-50 text-rose-800 ring-rose-200", kicker: "Not safe to merge yet", head: `${plural(breaks)} will break` }
+      : touched > 0
+        ? { tone: "bg-amber-50 text-amber-900 ring-amber-200", kicker: "Review before merging", head: "Nothing breaks" }
+        : { tone: "bg-emerald-50 text-emerald-800 ring-emerald-200", kicker: "Looks safe", head: "Nothing affected" };
   return (
-    <div
-      className={`shrink-0 rounded-xl px-4 py-2.5 ring-1 ${
-        risky ? "bg-rose-50 text-rose-800 ring-rose-200" : "bg-emerald-50 text-emerald-800 ring-emerald-200"
-      }`}
-    >
-      <div className="text-xs font-medium opacity-75">{risky ? "Not safe to merge yet" : "Looks safe"}</div>
-      <div className="text-lg font-bold">
-        {risky ? `${breaks} file${breaks === 1 ? "" : "s"} will break` : "Nothing breaks"}
-      </div>
-      <div className="text-xs opacity-75">{touched} files need attention</div>
+    <div className={`shrink-0 rounded-xl px-4 py-2.5 ring-1 ${v.tone}`}>
+      <div className="text-xs font-medium opacity-75">{v.kicker}</div>
+      <div className="text-lg font-bold">{v.head}</div>
+      {touched > 0 && <div className="text-xs opacity-75">{plural(touched)} to look at</div>}
     </div>
   );
 }

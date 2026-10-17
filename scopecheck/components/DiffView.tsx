@@ -50,14 +50,14 @@ function FileDiff({ edit }: { edit: Edit }) {
           <span className="text-emerald-600">+{added}</span> <span className="text-rose-500">−{removed}</span>
         </span>
       </div>
-      <pre className="overflow-x-auto py-1.5 font-mono text-[12.5px] leading-6">
+      <pre className="overflow-hidden py-1.5 font-mono text-[12.5px] leading-6">
         {hunks(lines).map((l, i) =>
           l === "gap" ? (
             <div key={i} className="bg-slate-50 px-8 text-slate-400">⋯</div>
           ) : (
             <div key={i} className={`flex ${ROW[l.type].row}`}>
               <span className={`w-8 shrink-0 select-none text-center ${ROW[l.type].signColor}`}>{ROW[l.type].sign}</span>
-              <span className={`whitespace-pre pr-4 ${l.type === "same" ? "text-slate-500" : ""}`}>{l.text || " "}</span>
+              <span className={`min-w-0 whitespace-pre-wrap [overflow-wrap:anywhere] pr-4 ${l.type === "same" ? "text-slate-500" : ""}`}>{l.text || " "}</span>
             </div>
           ),
         )}
