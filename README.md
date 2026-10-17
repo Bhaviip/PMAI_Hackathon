@@ -1,5 +1,7 @@
 # ScopeCheck
 
+World's First Dynamic Ergonomic Team: Bhavi Patel, Pranav Dixit, Urmila Das
+
 **See what a code change affects before you merge it.**
 
 You give ScopeCheck a code change. It shows every other file in the project that the change touches, marks how serious each one is, and points to the exact lines that prove it.
