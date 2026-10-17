@@ -17,6 +17,8 @@ type Props = {
   constraints: string[];
   review: ReviewState;
   dispatch: (a: ReviewAction) => void;
+  reviewerRole: string;
+  onReviewerRole: (role: string) => void;
   selectedId: string | null;
   onSelect: (id: string) => void;
   onFocusEvidence: (key: string) => void;
@@ -24,7 +26,7 @@ type Props = {
 
 // Right pane: summary counts, the finding list, and the selected finding's detail.
 export function FindingReview(props: Props) {
-  const { result, artifacts, review, selectedId, onSelect } = props;
+  const { result, artifacts, review, reviewerRole, onReviewerRole, selectedId, onSelect } = props;
   const byArtifact = new Map(artifacts.map((a) => [a.id, a]));
   const counts = Object.fromEntries(
     KIND_ORDER.map((k) => [k, result.findings.filter((f) => f.kind === k).length]),
@@ -46,6 +48,16 @@ export function FindingReview(props: Props) {
           </div>
         ))}
       </div>
+
+      <label className="flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2">
+        <span className="shrink-0 text-xs font-semibold uppercase tracking-wide text-slate-500">Your role</span>
+        <input
+          value={reviewerRole}
+          onChange={(e) => onReviewerRole(e.target.value)}
+          placeholder="e.g. PM, Engineering lead (needed to accept)"
+          className="w-full rounded border border-slate-300 p-1.5 text-sm"
+        />
+      </label>
 
       <ul className="divide-y divide-slate-200 overflow-hidden rounded-lg border border-slate-300 bg-white">
         {result.findings.map((f) => {
@@ -110,13 +122,26 @@ function FindingDetail({
   constraints,
   review,
   dispatch,
+  reviewerRole,
+  result,
+  onSelect,
   onFocusEvidence,
 }: Props & { finding: Finding; artifact: Artifact | undefined }) {
   const r = review[f.id];
   if (!r) return null;
   const isUpdate = f.kind === "update";
-  const edit = (field: "reviewer_role" | "reviewer_note" | "edited_revision", value: string) =>
+  const edit = (field: "reviewer_note" | "edited_revision", value: string) =>
     dispatch({ type: "edit", findingId: f.id, field, value });
+
+  // After a decision, move on to the next pending finding so a reviewer can work down the list.
+  function decide(status: ReviewStatus) {
+    dispatch({ type: "decide", findingId: f.id, status, reviewerRole });
+    if (status === "pending") return;
+    const ids = result.findings.map((x) => x.id);
+    const start = ids.indexOf(f.id);
+    const next = [...ids.slice(start + 1), ...ids.slice(0, start)].find((id) => review[id]?.status === "pending");
+    if (next) onSelect(next);
+  }
 
   return (
     <section className="space-y-3 rounded-lg border border-slate-300 bg-white p-4">
@@ -185,16 +210,7 @@ function FindingDetail({
         </div>
       )}
 
-      <div className="grid gap-3 border-t border-slate-200 pt-3 md:grid-cols-2">
-        <label className="block">
-          <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Your role</span>
-          <input
-            value={r.reviewer_role}
-            onChange={(e) => edit("reviewer_role", e.target.value)}
-            placeholder="e.g. PM, Engineering lead"
-            className="mt-1 w-full rounded border border-slate-300 p-2 text-sm"
-          />
-        </label>
+      <div className="border-t border-slate-200 pt-3">
         <label className="block">
           <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Note</span>
           <input
@@ -207,21 +223,24 @@ function FindingDetail({
 
       <div className="flex flex-wrap items-center gap-2">
         {DECISIONS.map((d) => {
-          const allowed = canDecide(r, d.status);
+          const allowed = canDecide(reviewerRole, d.status);
           return (
             <button
               key={d.status}
               type="button"
               disabled={!allowed || r.status === d.status}
-              onClick={() => dispatch({ type: "decide", findingId: f.id, status: d.status })}
+              onClick={() => decide(d.status)}
               className={`rounded px-3 py-1.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-40 ${d.style}`}
             >
               {d.label}
             </button>
           );
         })}
-        {!canDecide(r, "accepted") && (
-          <span className="text-xs text-slate-500">Enter your role to accept.</span>
+        {!canDecide(reviewerRole, "accepted") && (
+          <span className="text-xs text-slate-500">Enter your role above to accept.</span>
+        )}
+        {r.status !== "pending" && r.reviewer_role && (
+          <span className="text-xs text-slate-500">Decided by {r.reviewer_role}</span>
         )}
       </div>
     </section>

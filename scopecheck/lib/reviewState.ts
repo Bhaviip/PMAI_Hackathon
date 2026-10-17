@@ -31,8 +31,8 @@ export function initialReviewState(findings: Finding[]): ReviewState {
 }
 
 export type ReviewAction =
-  | { type: "edit"; findingId: string; field: "reviewer_role" | "reviewer_note" | "edited_revision"; value: string }
-  | { type: "decide"; findingId: string; status: ReviewStatus }
+  | { type: "edit"; findingId: string; field: "reviewer_note" | "edited_revision"; value: string }
+  | { type: "decide"; findingId: string; status: ReviewStatus; reviewerRole: string }
   | { type: "reset"; findings: Finding[] };
 
 export function reviewReducer(state: ReviewState, action: ReviewAction): ReviewState {
@@ -50,15 +50,17 @@ export function reviewReducer(state: ReviewState, action: ReviewAction): ReviewS
     case "decide": {
       const current = state[action.findingId];
       if (!current) return state;
-      if (!canDecide(current, action.status)) return state;
-      return { ...state, [action.findingId]: { ...current, status: action.status } };
+      if (!canDecide(action.reviewerRole, action.status)) return state;
+      // The role in effect when the decision is made is recorded on the finding.
+      const reviewer_role = action.status === "pending" ? "" : action.reviewerRole.trim();
+      return { ...state, [action.findingId]: { ...current, status: action.status, reviewer_role } };
     }
   }
 }
 
 // Accepting a proposal requires a reviewer role (a demo label, not authentication).
-export function canDecide(review: FindingReview, status: ReviewStatus): boolean {
-  if (status === "accepted") return review.reviewer_role.trim().length > 0;
+export function canDecide(reviewerRole: string, status: ReviewStatus): boolean {
+  if (status === "accepted") return reviewerRole.trim().length > 0;
   return true;
 }
 

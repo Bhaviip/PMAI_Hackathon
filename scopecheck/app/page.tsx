@@ -26,6 +26,8 @@ export default function Home() {
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [review, dispatch] = useReducer(reviewReducer, {});
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // One reviewer per session in this single-user demo; recorded on each decision.
+  const [reviewerRole, setReviewerRole] = useState("");
   const [focusKey, setFocusKey] = useState<string | null>(null);
 
   const selected = result?.findings.find((f) => f.id === selectedId);
@@ -114,6 +116,8 @@ export default function Home() {
               constraints={packet.change_request.protected_constraints}
               review={review}
               dispatch={dispatch}
+              reviewerRole={reviewerRole}
+              onReviewerRole={setReviewerRole}
               selectedId={selectedId}
               onSelect={select}
               onFocusEvidence={setFocusKey}
