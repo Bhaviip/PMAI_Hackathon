@@ -1,5 +1,10 @@
+// Line-by-line diff of two versions of a file. Used by lib/analyze.ts to find the
+// changed lines, and by components/DiffView.tsx to show the change.
+
+// One line of a diff: unchanged, added in the new version, or deleted from the old one.
 export type DiffLine = { type: "same" | "add" | "del"; text: string };
 
+// Size limit for the comparison table (old lines × new lines) to avoid freezing the browser.
 const MAX_CELLS = 4_000_000;
 
 // Line diff: shared prefix and suffix are trimmed, then the middle is diffed by
@@ -23,6 +28,8 @@ export function diffLines(before: string, after: string): DiffLine[] {
   ];
 }
 
+// dp[i][j] is the length of the longest common run of lines between a[i..] and b[j..].
+// Walking it from the top gives the fewest additions and deletions.
 function middle(a: string[], b: string[]): DiffLine[] {
   if (a.length * b.length > MAX_CELLS)
     return [...a.map((text) => ({ type: "del" as const, text })), ...b.map((text) => ({ type: "add" as const, text }))];

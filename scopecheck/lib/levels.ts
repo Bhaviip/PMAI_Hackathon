@@ -1,6 +1,11 @@
+// The four impact levels, how each one looks, and the check that every quoted
+// proof line really exists in its file.
+
 import type { Level } from "@/fixtures/codeChangeDemo";
 
 // Every level is shown as a text label; color only reinforces it.
+// text, mark and tint are Tailwind classes (app/globals.css defines the colors);
+// stroke is the same color as a hex value for the SVG impact map.
 export const LEVELS: Record<Level, { label: string; hint: string; text: string; mark: string; tint: string; stroke: string }> = {
   breaks: { label: "Breaks", hint: "Will fail or crash", text: "text-brick", mark: "bg-brick", tint: "bg-brick-50", stroke: "#b4442c" },
   update: { label: "Needs update", hint: "Out of date after this change", text: "text-ochre", mark: "bg-ochre", tint: "bg-ochre-50", stroke: "#a86a12" },
@@ -8,6 +13,7 @@ export const LEVELS: Record<Level, { label: string; hint: string; text: string; 
   safe: { label: "Still safe", hint: "Related, but not affected", text: "text-moss", mark: "bg-moss", tint: "bg-moss-50", stroke: "#4d7a3a" },
 };
 
+// Most severe first. Lists, counts and the map all sort by this.
 export const LEVEL_ORDER: Level[] = ["breaks", "update", "check", "safe"];
 
 // Finds the 1-based line numbers of each quoted snippet. A quote that is not in

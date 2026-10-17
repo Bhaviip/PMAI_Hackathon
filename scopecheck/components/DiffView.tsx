@@ -1,11 +1,15 @@
 import { diffLines, type DiffLine } from "@/lib/diff";
 import type { Edit } from "@/fixtures/codeChangeDemo";
 
+// "The change" section of the page: shows each edited file as a diff.
+
+// Row background, sign and sign color for each kind of diff line.
 const ROW = {
   same: { row: "", sign: " ", signColor: "text-faint" },
   add: { row: "bg-moss-50 text-ink", sign: "+", signColor: "text-moss" },
   del: { row: "bg-brick-50 text-ink", sign: "−", signColor: "text-brick" },
 };
+// Unchanged lines kept around each change, and edited files shown before "and N more".
 const CONTEXT = 2;
 const MAX_FILES = 5;
 
