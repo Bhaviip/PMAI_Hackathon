@@ -2,9 +2,9 @@ import { diffLines, type DiffLine } from "@/lib/diff";
 import type { Edit } from "@/fixtures/codeChangeDemo";
 
 const ROW = {
-  same: { row: "", sign: " ", signColor: "text-slate-300" },
-  add: { row: "bg-emerald-50 text-emerald-900", sign: "+", signColor: "text-emerald-600" },
-  del: { row: "bg-rose-50 text-rose-900", sign: "−", signColor: "text-rose-500" },
+  same: { row: "", sign: " ", signColor: "text-faint" },
+  add: { row: "bg-moss-50 text-ink", sign: "+", signColor: "text-moss" },
+  del: { row: "bg-brick-50 text-ink", sign: "−", signColor: "text-brick" },
 };
 const CONTEXT = 2;
 const MAX_FILES = 5;
@@ -32,7 +32,7 @@ export function DiffView({ edits }: { edits: Edit[] }) {
         <FileDiff key={e.path} edit={e} />
       ))}
       {edits.length > MAX_FILES && (
-        <p className="text-xs text-slate-500">and {edits.length - MAX_FILES} more changed files</p>
+        <p className="text-xs text-muted">and {edits.length - MAX_FILES} more changed files</p>
       )}
     </div>
   );
@@ -43,21 +43,21 @@ function FileDiff({ edit }: { edit: Edit }) {
   const added = lines.filter((l) => l.type === "add").length;
   const removed = lines.filter((l) => l.type === "del").length;
   return (
-    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-      <div className="flex items-center gap-3 border-b border-slate-200 bg-slate-50 px-4 py-2">
-        <span className="truncate font-mono text-xs text-slate-700">{edit.path}</span>
+    <div className="overflow-hidden rounded-lg border border-line bg-card">
+      <div className="flex items-center gap-3 border-b border-line bg-paper px-4 py-2">
+        <span className="truncate font-mono text-xs text-ink">{edit.path}</span>
         <span className="ml-auto shrink-0 font-mono text-xs">
-          <span className="text-emerald-600">+{added}</span> <span className="text-rose-500">−{removed}</span>
+          <span className="text-moss">+{added}</span> <span className="text-brick">−{removed}</span>
         </span>
       </div>
       <pre className="overflow-hidden py-1.5 font-mono text-[12.5px] leading-6">
         {hunks(lines).map((l, i) =>
           l === "gap" ? (
-            <div key={i} className="bg-slate-50 px-8 text-slate-400">⋯</div>
+            <div key={i} className="bg-paper px-8 text-faint">⋯</div>
           ) : (
             <div key={i} className={`flex ${ROW[l.type].row}`}>
               <span className={`w-8 shrink-0 select-none text-center ${ROW[l.type].signColor}`}>{ROW[l.type].sign}</span>
-              <span className={`min-w-0 whitespace-pre-wrap [overflow-wrap:anywhere] pr-4 ${l.type === "same" ? "text-slate-500" : ""}`}>{l.text || " "}</span>
+              <span className={`min-w-0 whitespace-pre-wrap [overflow-wrap:anywhere] pr-4 ${l.type === "same" ? "text-muted" : ""}`}>{l.text || " "}</span>
             </div>
           ),
         )}

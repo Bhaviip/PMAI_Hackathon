@@ -14,10 +14,10 @@ type Tab = "folder" | "github";
 export function NewAnalysis({ onDone }: { onDone: (a: Analysis) => void }) {
   const [tab, setTab] = useState<Tab>("folder");
   return (
-    <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200 sm:p-6">
-      <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Analyze your code</h1>
-      <p className="mt-1 text-sm text-slate-500">Files stay in your browser. Nothing is uploaded to a server.</p>
-      <div className="mt-5 inline-flex rounded-xl bg-slate-100 p-1" role="tablist">
+    <section className="rounded-lg bg-card p-5 border border-line sm:p-6">
+      <h1 className="font-serif text-[34px] font-semibold leading-tight tracking-tight">Analyze your code</h1>
+      <p className="mt-1 text-sm text-muted">Files stay in your browser. Nothing is uploaded to a server.</p>
+      <div className="mt-5 inline-flex rounded-lg bg-paper p-1" role="tablist">
         {(
           [
             ["folder", "Upload a folder"],
@@ -31,7 +31,7 @@ export function NewAnalysis({ onDone }: { onDone: (a: Analysis) => void }) {
             aria-selected={tab === id}
             onClick={() => setTab(id)}
             className={`rounded-lg px-4 py-1.5 text-sm font-medium transition ${
-              tab === id ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800"
+              tab === id ? "bg-card text-ink" : "text-muted hover:text-ink"
             }`}
           >
             {label}
@@ -86,9 +86,9 @@ function FolderFlow({ onDone }: { onDone: (a: Analysis) => void }) {
   return (
     <div className="space-y-5">
       <Step n={1} title="Pick your project folder">
-        <label className="flex cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-slate-300 px-4 py-7 text-center hover:border-indigo-400 hover:bg-indigo-50/40">
-          <span className="text-sm font-semibold text-indigo-600">{loading ? "Reading files…" : "Choose a folder"}</span>
-          <span className="text-xs text-slate-500">Code, tests and docs are read. node_modules, builds and lock files are skipped.</span>
+        <label className="flex cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed border-line px-4 py-7 text-center hover:border-ink hover:bg-paper">
+          <span className="text-sm font-semibold text-accent">{loading ? "Reading files…" : "Choose a folder"}</span>
+          <span className="text-xs text-muted">Code, tests and docs are read. node_modules, builds and lock files are skipped.</span>
           <input
             type="file"
             className="sr-only"
@@ -99,7 +99,7 @@ function FolderFlow({ onDone }: { onDone: (a: Analysis) => void }) {
           />
         </label>
         {project && (
-          <p className="mt-2 text-sm text-slate-600">
+          <p className="mt-2 text-sm text-muted">
             <span className="font-semibold">{project.name}</span> · {project.files.length} files read
             {project.files.length >= MAX_FILES && ` (first ${MAX_FILES})`}
           </p>
@@ -114,16 +114,16 @@ function FolderFlow({ onDone }: { onDone: (a: Analysis) => void }) {
                 value={filter}
                 onChange={(e) => setFilter(e.target.value)}
                 placeholder="Find a file"
-                className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm"
+                className="w-full rounded-lg border border-line px-3 py-1.5 text-sm"
               />
-              <ul className="mt-2 max-h-72 overflow-y-auto rounded-lg border border-slate-200 text-sm">
+              <ul className="mt-2 max-h-72 overflow-y-auto rounded-lg border border-line text-sm">
                 {shown.map((f) => (
                   <li key={f.path}>
                     <button
                       type="button"
                       onClick={() => choose(f.path)}
                       className={`block w-full truncate px-3 py-1.5 text-left font-mono text-xs ${
-                        f.path === path ? "bg-indigo-50 text-indigo-700" : "hover:bg-slate-50"
+                        f.path === path ? "bg-highlight text-accent" : "hover:bg-paper"
                       }`}
                     >
                       {f.path}
@@ -136,8 +136,8 @@ function FolderFlow({ onDone }: { onDone: (a: Analysis) => void }) {
               {path ? (
                 <>
                   <div className="flex items-center justify-between text-xs">
-                    <span className="truncate font-mono text-slate-600">{path}</span>
-                    <span className={changedLines ? "font-semibold text-indigo-600" : "text-slate-400"}>
+                    <span className="truncate font-mono text-muted">{path}</span>
+                    <span className={changedLines ? "font-semibold text-accent" : "text-faint"}>
                       {changedLines ? `${changedLines} lines changed` : "Edit the code below"}
                     </span>
                   </div>
@@ -145,11 +145,11 @@ function FolderFlow({ onDone }: { onDone: (a: Analysis) => void }) {
                     value={draft}
                     onChange={(e) => setDraft(e.target.value)}
                     spellCheck={false}
-                    className="mt-1 h-72 w-full rounded-lg border border-slate-300 bg-slate-50 p-3 font-mono text-xs leading-5"
+                    className="mt-1 h-72 w-full rounded-lg border border-line bg-paper p-3 font-mono text-xs leading-5"
                   />
                 </>
               ) : (
-                <div className="grid h-full min-h-40 place-items-center rounded-lg border border-dashed border-slate-300 text-sm text-slate-400">
+                <div className="grid h-full min-h-40 place-items-center rounded-lg border border-dashed border-line text-sm text-faint">
                   Choose a file to edit
                 </div>
               )}
@@ -165,13 +165,13 @@ function FolderFlow({ onDone }: { onDone: (a: Analysis) => void }) {
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Name this change (optional)"
-              className="min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              className="min-w-0 flex-1 rounded-lg border border-line px-3 py-2 text-sm"
             />
             <button
               type="button"
               disabled={!changedLines}
               onClick={run}
-              className="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-40"
+              className="rounded-lg bg-ink px-5 py-2 text-sm font-semibold text-white hover:bg-accent disabled:opacity-40"
             >
               Find affected files
             </button>
@@ -216,19 +216,19 @@ function GithubFlow({ onDone }: { onDone: (a: Analysis) => void }) {
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             placeholder="https://github.com/owner/repo/pull/123"
-            className="min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-2 font-mono text-sm"
+            className="min-w-0 flex-1 rounded-lg border border-line px-3 py-2 font-mono text-sm"
           />
           <button
             type="submit"
             disabled={!url.trim() || busy !== null}
-            className="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-40"
+            className="rounded-lg bg-ink px-5 py-2 text-sm font-semibold text-white hover:bg-accent disabled:opacity-40"
           >
             {busy ? "Working…" : "Analyze"}
           </button>
         </form>
-        {busy && <p className="mt-2 text-sm text-slate-500">{busy}…</p>}
-        {error && <p className="mt-2 text-sm font-medium text-rose-700">{error}</p>}
-        <p className="mt-2 text-xs text-slate-400">
+        {busy && <p className="mt-2 text-sm text-muted">{busy}…</p>}
+        {error && <p className="mt-2 text-sm font-medium text-brick">{error}</p>}
+        <p className="mt-2 text-xs text-faint">
           Works with public repositories. GitHub allows about 60 requests an hour without signing in.
         </p>
       </Step>
@@ -239,7 +239,7 @@ function GithubFlow({ onDone }: { onDone: (a: Analysis) => void }) {
 function Step({ n, title, children }: { n: number; title: string; children: React.ReactNode }) {
   return (
     <div className="flex gap-3">
-      <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-indigo-50 text-sm font-bold text-indigo-600">{n}</span>
+      <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-highlight text-sm font-bold text-accent">{n}</span>
       <div className="min-w-0 flex-1">
         <h2 className="mb-2 mt-0.5 text-sm font-semibold">{title}</h2>
         {children}

@@ -1,5 +1,37 @@
 @import "tailwindcss";
 
+/* A warm paper-and-ink palette: one dark accent, muted status colors. */
+@theme {
+  --font-sans: var(--font-plex-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-serif: var(--font-newsreader), Georgia, serif;
+
+  --color-paper: #f6f4ef;
+  --color-card: #fdfcf9;
+  --color-ink: #1d1b17;
+  --color-muted: #6b665c;
+  --color-faint: #a39e93;
+  --color-line: #e4e0d6;
+  --color-accent: #23395d;
+  --color-highlight: #f5ecd2;
+
+  --color-brick: #b4442c;
+  --color-brick-50: #f8ebe6;
+  --color-ochre: #a86a12;
+  --color-ochre-50: #f6eedd;
+  --color-steel: #3b6a8f;
+  --color-steel-50: #e7eef4;
+  --color-moss: #4d7a3a;
+  --color-moss-50: #e9f0e3;
+}
+
 body {
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--color-highlight);
 }
