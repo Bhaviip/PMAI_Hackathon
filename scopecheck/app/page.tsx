@@ -5,6 +5,7 @@ import { changes, files, type CodeChange, type Level } from "@/fixtures/codeChan
 import { ImpactMap } from "@/components/ImpactMap";
 import { CodeView } from "@/components/CodeView";
 import { DiffView } from "@/components/DiffView";
+import { NewAnalysis, type Analysis } from "@/components/NewAnalysis";
 import { LEVELS, LEVEL_ORDER, locateEvidence } from "@/lib/levels";
 
 // Sidebar wording, e.g. "1 break", "3 breaks", "2 to update".
@@ -15,8 +16,7 @@ const SHORT: Record<Level, (n: number) => string> = {
   safe: () => "safe",
 };
 
-const fileByPath = new Map(files.map((f) => [f.path, f]));
-const kinds = new Map(files.map((f) => [f.path, f.kind]));
+const samples: Analysis[] = changes.map((change) => ({ change, files }));
 
 // Impacts in the order the map and the evidence stepper show them: most severe first.
 const ordered = (c: CodeChange) =>
@@ -26,17 +26,27 @@ const countLevels = (c: CodeChange) =>
   Object.fromEntries(LEVEL_ORDER.map((l) => [l, c.impacts.filter((i) => i.level === l).length])) as Record<Level, number>;
 
 export default function Home() {
-  const [changeId, setChangeId] = useState(changes[0].id);
-  const change = changes.find((c) => c.id === changeId) ?? changes[0];
+  const [mine, setMine] = useState<Analysis[]>([]);
+  const all = [...mine, ...samples];
+  const [changeId, setChangeId] = useState<string | null>(changes[0].id);
+  const current = all.find((a) => a.change.id === changeId) ?? null;
+  const change = current?.change ?? changes[0];
+  const isSample = !mine.some((a) => a.change.id === change.id);
   const impacts = ordered(change);
   const [selected, setSelected] = useState<string | null>(impacts[0]?.path ?? null);
   const [focusLevel, setFocusLevel] = useState<Level | null>(null);
+  const fileByPath = new Map((current?.files ?? files).map((f) => [f.path, f]));
+  const kinds = new Map((current?.files ?? files).map((f) => [f.path, f.kind]));
 
-  function pickChange(id: string) {
-    const next = changes.find((c) => c.id === id) ?? changes[0];
-    setChangeId(id);
+  function show(next: CodeChange) {
+    setChangeId(next.id);
     setSelected(ordered(next)[0]?.path ?? null);
     setFocusLevel(null);
+  }
+
+  function added(a: Analysis) {
+    setMine((m) => [a, ...m]);
+    show(a.change);
   }
 
   const counts = countLevels(change);
@@ -44,7 +54,7 @@ export default function Home() {
   const impact = impacts[index] ?? null;
   const file = impact ? fileByPath.get(impact.path) : undefined;
   const evidence = impact && file ? locateEvidence(file.code, impact.evidence) : null;
-  const step = (d: number) => setSelected(impacts[(index + d + impacts.length) % impacts.length].path);
+  const step = (d: number) => impacts.length && setSelected(impacts[(index + d + impacts.length) % impacts.length].path);
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
@@ -55,61 +65,67 @@ export default function Home() {
           </span>
           <span className="text-[15px] font-bold tracking-tight">ScopeCheck</span>
           <span className="hidden text-slate-300 sm:inline">/</span>
-          <span className="hidden truncate font-mono text-sm text-slate-500 sm:inline">{change.pr.repo}</span>
-          <span className="ml-auto inline-flex shrink-0 items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800 ring-1 ring-amber-200">
-            <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-            Sample data
-          </span>
+          <span className="hidden truncate font-mono text-sm text-slate-500 sm:inline">{current ? change.pr.repo : "New analysis"}</span>
+          {current &&
+            (isSample ? (
+              <span className="ml-auto inline-flex shrink-0 items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800 ring-1 ring-amber-200">
+                <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                Sample data
+              </span>
+            ) : (
+              <span
+                className="ml-auto inline-flex shrink-0 items-center gap-1.5 rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-800 ring-1 ring-indigo-200"
+                title="Found by matching changed names and values across your files. Review each result."
+              >
+                <span className="h-1.5 w-1.5 rounded-full bg-indigo-500" />
+                Your code · keyword scan
+              </span>
+            ))}
         </div>
       </header>
 
       <div className="mx-auto grid max-w-[1400px] gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[260px_minmax(0,1fr)]">
         <aside className="min-w-0">
-          <h2 className="px-1 text-xs font-semibold uppercase tracking-wider text-slate-400">Pull requests</h2>
-          <ul className="mt-3 space-y-2">
-            {changes.map((c) => {
-              const k = countLevels(c);
-              const on = c.id === change.id;
-              return (
-                <li key={c.id}>
-                  <button
-                    type="button"
-                    onClick={() => pickChange(c.id)}
-                    aria-pressed={on}
-                    className={`w-full rounded-xl px-3.5 py-3 text-left transition ${
-                      on ? "bg-white shadow-sm ring-2 ring-indigo-500" : "ring-1 ring-slate-200 hover:bg-white"
-                    }`}
-                  >
-                    <div className="flex items-baseline gap-2">
-                      <span className="font-mono text-xs text-slate-400">#{c.pr.number}</span>
-                      <span className="truncate text-sm font-semibold">{c.title}</span>
-                    </div>
-                    <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500">
-                      {LEVEL_ORDER.filter((l) => l !== "safe" && k[l] > 0).map((l) => (
-                        <span key={l} className="inline-flex items-center gap-1">
-                          <span className={`h-1.5 w-1.5 rounded-full ${LEVELS[l].dot}`} />
-                          {k[l]} {SHORT[l](k[l])}
-                        </span>
-                      ))}
-                    </div>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
+          <button
+            type="button"
+            onClick={() => setChangeId(null)}
+            aria-pressed={!current}
+            className={`mb-5 flex w-full items-center justify-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition ${
+              current ? "bg-indigo-600 text-white hover:bg-indigo-700" : "bg-indigo-50 text-indigo-700 ring-2 ring-indigo-500"
+            }`}
+          >
+            <span className="text-lg leading-none">+</span> Analyze your code
+          </button>
+          {mine.length > 0 && <ChangeList title="Your changes" items={mine} activeId={changeId} onPick={show} />}
+          <ChangeList title="Sample pull requests" items={samples} activeId={changeId} onPick={show} />
         </aside>
 
         <main className="min-w-0 space-y-6">
+          {!current ? (
+            <NewAnalysis onDone={added} />
+          ) : (
+            <>
           <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200 sm:p-6">
             <div className="flex flex-wrap items-start gap-4">
               <div className="min-w-0 flex-1">
                 <h1 className="text-xl font-bold tracking-tight sm:text-2xl">
-                  {change.title} <span className="font-normal text-slate-400">#{change.pr.number}</span>
+                  {change.title}{" "}
+                  {change.pr.number !== undefined && <span className="font-normal text-slate-400">#{change.pr.number}</span>}
                 </h1>
                 <p className="mt-1 text-sm text-slate-500">
-                  <span className="font-medium text-slate-700">{change.pr.author}</span> wants to merge{" "}
-                  <span className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs">{change.pr.branch}</span> into{" "}
-                  <span className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs">main</span>
+                  {change.pr.branch ? (
+                    <>
+                      <span className="font-medium text-slate-700">{change.pr.author}</span> wants to merge{" "}
+                      <span className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs">{change.pr.branch}</span> into{" "}
+                      <span className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs">{change.pr.base ?? "main"}</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="font-medium text-slate-700">{change.pr.author}</span> edited{" "}
+                      {change.edits.length} file{change.edits.length === 1 ? "" : "s"} in{" "}
+                      <span className="font-mono text-xs">{change.pr.repo}</span>
+                    </>
+                  )}
                 </p>
               </div>
               <Verdict breaks={counts.breaks} touched={change.impacts.length - counts.safe} />
@@ -140,7 +156,7 @@ export default function Home() {
                   );
                 })}
               </div>
-              <DiffView path={change.path} before={change.before} after={change.after} />
+              <DiffView edits={change.edits} />
             </div>
           </section>
 
@@ -156,7 +172,13 @@ export default function Home() {
                   <span className="text-xs text-slate-400">Click a file to see the proof</span>
                 )}
               </div>
-              <ImpactMap change={change} kinds={kinds} selected={selected} focusLevel={focusLevel} onSelect={setSelected} />
+              {impacts.length ? (
+                <ImpactMap change={change} kinds={kinds} selected={selected} focusLevel={focusLevel} onSelect={setSelected} />
+              ) : (
+                <div className="grid min-h-60 place-items-center rounded-xl bg-slate-50 p-6 text-center text-sm text-slate-500">
+                  Nothing else in the project uses the names or values this change touches.
+                </div>
+              )}
             </section>
 
             {impact && (
@@ -197,6 +219,8 @@ export default function Home() {
             )}
           </div>
 
+            </>
+          )}
           <HowItWorks />
         </main>
       </div>
@@ -257,5 +281,55 @@ function HowItWorks() {
         </div>
       ))}
     </section>
+  );
+}
+
+function ChangeList({
+  title,
+  items,
+  activeId,
+  onPick,
+}: {
+  title: string;
+  items: Analysis[];
+  activeId: string | null;
+  onPick: (c: CodeChange) => void;
+}) {
+  return (
+    <div className="mb-5">
+      <h2 className="px-1 text-xs font-semibold uppercase tracking-wider text-slate-400">{title}</h2>
+      <ul className="mt-3 space-y-2">
+        {items.map(({ change: c }) => {
+          const k = countLevels(c);
+          const on = c.id === activeId;
+          return (
+            <li key={c.id}>
+              <button
+                type="button"
+                onClick={() => onPick(c)}
+                aria-pressed={on}
+                className={`w-full rounded-xl px-3.5 py-3 text-left transition ${
+                  on ? "bg-white shadow-sm ring-2 ring-indigo-500" : "ring-1 ring-slate-200 hover:bg-white"
+                }`}
+              >
+                <div className="flex items-baseline gap-2">
+                  {c.pr.number !== undefined && <span className="font-mono text-xs text-slate-400">#{c.pr.number}</span>}
+                  <span className="truncate text-sm font-semibold">{c.title}</span>
+                </div>
+                <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500">
+                  {LEVEL_ORDER.filter((l) => l !== "safe" && k[l] > 0).map((l) => (
+                    <span key={l} className="inline-flex items-center gap-1">
+                      <span className={`h-1.5 w-1.5 rounded-full ${LEVELS[l].dot}`} />
+                      {k[l]} {SHORT[l](k[l])}
+                    </span>
+                  ))}
+                  {c.impacts.length === 0 && <span>No affected files</span>}
+                </div>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
   );
 }

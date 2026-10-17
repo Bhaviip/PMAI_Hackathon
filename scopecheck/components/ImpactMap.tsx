@@ -70,10 +70,11 @@ export function ImpactMap({ change, kinds, selected, focusLevel, onSelect }: Pro
       <g filter="url(#shadow)">
         <rect x={CX - 112} y={CY - 38} width={224} height={76} rx={16} fill="#4f46e5" />
         <text x={CX} y={CY - 9} textAnchor="middle" fill="#c7d2fe" fontSize={10.5} fontWeight={700} letterSpacing={1.2}>
-          CHANGED IN #{change.pr.number}
+          {change.pr.number !== undefined ? `CHANGED IN #${change.pr.number}` : "YOUR CHANGE"}
         </text>
         <text x={CX} y={CY + 16} textAnchor="middle" fill="#fff" fontSize={16} fontWeight={700} fontFamily="ui-monospace, SFMono-Regular, Menlo, monospace">
-          {fileName(change.path)}
+          {fileName(change.edits[0]?.path ?? "")}
+          {change.edits.length > 1 && ` +${change.edits.length - 1}`}
         </text>
       </g>
 

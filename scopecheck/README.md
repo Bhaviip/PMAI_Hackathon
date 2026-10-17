@@ -18,4 +18,9 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:3000. Pick a code change at the top. The map shows every file it affects, marked Breaks, Needs update, Check or Still safe. Click a file to see the exact lines that prove it. The project and the analysis are fictional sample data in fixtures/codeChangeDemo.ts, not a live result; each quoted line is checked against the file before it is shown as evidence.
+Open http://localhost:3000. The two sample pull requests use a fictional project with a hand-written analysis. To try your own code, click **Analyze your code**:
+
+- **Upload a folder:** pick a project folder, choose a file, edit it in the browser, then click Find affected files.
+- **GitHub pull request:** paste a link to a pull request in a public repository.
+
+Your files stay in the browser. The scan for your own code is a keyword scan (lib/analyze.ts): it collects the names and values the change removes, renames or edits, plus the function that contains each changed line, then quotes every line elsewhere in the project that uses them. It reads names, not meaning, so treat its verdicts as a starting point for review.

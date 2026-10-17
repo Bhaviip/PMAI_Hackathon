@@ -1,9 +1,31 @@
 export type DiffLine = { type: "same" | "add" | "del"; text: string };
 
-// Line diff via longest common subsequence. Inputs are a few lines, so O(n*m) is fine.
+const MAX_CELLS = 4_000_000;
+
+// Line diff: shared prefix and suffix are trimmed, then the middle is diffed by
+// longest common subsequence. A middle too large for that is shown as replaced.
 export function diffLines(before: string, after: string): DiffLine[] {
-  const a = before.split("\n");
-  const b = after.split("\n");
+  const a = before === "" ? [] : before.split("\n");
+  const b = after === "" ? [] : after.split("\n");
+  let start = 0;
+  while (start < a.length && start < b.length && a[start] === b[start]) start++;
+  let endA = a.length;
+  let endB = b.length;
+  while (endA > start && endB > start && a[endA - 1] === b[endB - 1]) {
+    endA--;
+    endB--;
+  }
+  const same = (t: string): DiffLine => ({ type: "same", text: t });
+  return [
+    ...a.slice(0, start).map(same),
+    ...middle(a.slice(start, endA), b.slice(start, endB)),
+    ...a.slice(endA).map(same),
+  ];
+}
+
+function middle(a: string[], b: string[]): DiffLine[] {
+  if (a.length * b.length > MAX_CELLS)
+    return [...a.map((text) => ({ type: "del" as const, text })), ...b.map((text) => ({ type: "add" as const, text }))];
   const dp = Array.from({ length: a.length + 1 }, () => new Array<number>(b.length + 1).fill(0));
   for (let i = a.length - 1; i >= 0; i--)
     for (let j = b.length - 1; j >= 0; j--)

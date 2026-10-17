@@ -13,18 +13,20 @@ export type Impact = {
   evidence: string[];
 };
 
-export type PullRequest = { repo: string; number: number; author: string; branch: string };
+export type PullRequest = { repo: string; number?: number; author: string; branch?: string; base?: string };
+
+export type Edit = { path: string; before: string; after: string };
 
 export type CodeChange = {
   id: string;
   title: string;
   pr: PullRequest;
   summary: string;
-  path: string;
-  before: string;
-  after: string;
+  edits: Edit[];
   impacts: Impact[];
 };
+
+type SampleChange = Omit<CodeChange, "edits"> & Edit;
 
 export const files: ProjectFile[] = [
   {
@@ -144,7 +146,7 @@ export async function sendReceipt(paymentId: string) {
   },
 ];
 
-export const changes: CodeChange[] = [
+const sampleChanges: SampleChange[] = [
   {
     id: "auto-ship",
     title: "Auto-send shipping replies",
@@ -241,3 +243,8 @@ export const changes: CodeChange[] = [
     ],
   },
 ];
+
+export const changes: CodeChange[] = sampleChanges.map(({ path, before, after, ...c }) => ({
+  ...c,
+  edits: [{ path, before, after }],
+}));
