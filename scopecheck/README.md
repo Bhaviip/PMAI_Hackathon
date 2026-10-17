@@ -18,4 +18,4 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:3000. Built so far (Antigravity task 1): the split-pane Setup, Review and Export screen driven by fixtures/demo_packet.json. Live analysis is not connected yet, so the only review available is the hand-written illustrative one, opened with "Open sample review" and labeled Sample review wherever it appears. Review decisions are held in memory; localStorage, Markdown download and the Gemini route come in tasks 3 and 4.
+Open http://localhost:3000. Pick a code change at the top. The map shows every file it affects, marked Breaks, Needs update, Check or Still safe. Click a file to see the exact lines that prove it. The project and the analysis are fictional sample data in fixtures/codeChangeDemo.ts, not a live result; each quoted line is checked against the file before it is shown as evidence.
