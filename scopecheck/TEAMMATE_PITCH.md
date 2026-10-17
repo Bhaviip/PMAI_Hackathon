@@ -1,0 +1,3 @@
+# ScopeCheck teammate pitch
+
+I'm building ScopeCheck for the AI product management track. When a team changes what an AI feature is allowed to do, its tickets, tests, and review rules can become inconsistent. Our tool reviews a change against those documents, shows the evidence for affected work, and lets a PM approve proposed updates. Our demo changes a support assistant from drafting replies to automatically sending only shipping-status answers, while preserving human review for refunds and account security. I'm looking for a teammate comfortable with Next.js and API integration, and ideally someone who enjoys product design or testing. I'll lead scope, workflow design, evaluation, and contribute to the build.

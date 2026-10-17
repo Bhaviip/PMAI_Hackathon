@@ -1,0 +1,161 @@
+{
+  "illustrative_only": true,
+  "note": "Manually authored expected review shape, not an executed model result or benchmark.",
+  "change_summary": "Permit automatic shipping-status replies only after successful order lookup; retain required human review elsewhere.",
+  "findings": [
+    {
+      "id": "F-01",
+      "artifact_id": "PRD-01",
+      "kind": "update",
+      "evidence": [
+        {
+          "section_id": "P1",
+          "quote": "The assistant drafts responses for a support agent. Every customer-facing answer requires approval by a support agent before sending."
+        }
+      ],
+      "explanation": "The blanket approval rule conflicts with the proposed narrow automatic-send exception.",
+      "proposed_revision": "Shipping-status answers may be sent automatically after successful order lookup and clear intent. Refunds, account-security requests, lookup failures, and uncertain intent require support-agent approval.",
+      "protected_constraint_ids": [
+        0,
+        1,
+        2
+      ]
+    },
+    {
+      "id": "F-02",
+      "artifact_id": "FE-12",
+      "kind": "update",
+      "evidence": [
+        {
+          "section_id": "F1",
+          "quote": "Every generated response appears in the agent review queue. The send control remains disabled until a support agent chooses Approve."
+        }
+      ],
+      "explanation": "The review queue and disabled send control apply to every response.",
+      "proposed_revision": "Show automatic shipping replies with their delivery status; route all other covered cases to the human review queue. Preserve the original customer question and supporting order information.",
+      "protected_constraint_ids": [
+        0,
+        1,
+        2
+      ]
+    },
+    {
+      "id": "F-03",
+      "artifact_id": "BE-18",
+      "kind": "update",
+      "evidence": [
+        {
+          "section_id": "B1",
+          "quote": "The outbound worker rejects every customer-support message when approval_id is missing."
+        }
+      ],
+      "explanation": "The worker rejects the missing approval that a permitted automatic reply would have.",
+      "proposed_revision": "Permit sending without approval_id only for a shipping-status request with successful order lookup and unambiguous intent. All remaining cases require approval_id.",
+      "protected_constraint_ids": [
+        0,
+        1,
+        2
+      ]
+    },
+    {
+      "id": "F-04",
+      "artifact_id": "QA-09",
+      "kind": "update",
+      "evidence": [
+        {
+          "section_id": "Q1",
+          "quote": "Given any support request, when approval_id is absent, then sending must fail."
+        }
+      ],
+      "explanation": "The universal rejection expectation must distinguish the new exception.",
+      "proposed_revision": "Add a passing case for shipping status with successful lookup and no approval_id. Retain rejection or human-review cases for refunds, account security, failed lookup, and uncertain intent.",
+      "protected_constraint_ids": [
+        0,
+        1,
+        2
+      ]
+    },
+    {
+      "id": "F-05",
+      "artifact_id": "DATA-04",
+      "kind": "update",
+      "evidence": [
+        {
+          "section_id": "A1",
+          "quote": "Every response_sent event requires reviewer_id. Events without reviewer_id are rejected."
+        }
+      ],
+      "explanation": "The required reviewer field excludes permitted automatic sends.",
+      "proposed_revision": "For automatic sends, record send_mode=automatic and a null reviewer_id; for reviewed sends, require reviewer_id. Keep automatic and reviewed timing metrics distinct.",
+      "protected_constraint_ids": [
+        0,
+        1,
+        2
+      ]
+    },
+    {
+      "id": "F-06",
+      "artifact_id": "POL-02",
+      "kind": "preserve",
+      "evidence": [
+        {
+          "section_id": "R1",
+          "quote": "Refund responses must be approved and sent by a support agent. The assistant must not authorize or issue a refund."
+        }
+      ],
+      "explanation": "The proposed change explicitly preserves refund review.",
+      "proposed_revision": "",
+      "protected_constraint_ids": [
+        0
+      ]
+    },
+    {
+      "id": "F-07",
+      "artifact_id": "POL-03",
+      "kind": "preserve",
+      "evidence": [
+        {
+          "section_id": "S1",
+          "quote": "Account-security responses require support-agent approval before sending. Identity-verification steps are unchanged."
+        }
+      ],
+      "explanation": "The proposed change explicitly preserves account-security review.",
+      "proposed_revision": "",
+      "protected_constraint_ids": [
+        1
+      ]
+    },
+    {
+      "id": "F-08",
+      "artifact_id": "BILL-07",
+      "kind": "unaffected",
+      "evidence": [
+        {
+          "section_id": "I1",
+          "quote": "Automatically send invoice receipts after successful payment. This billing service is separate from customer-support messages."
+        }
+      ],
+      "explanation": "This is a separate billing receipt workflow explicitly excluded from the change.",
+      "proposed_revision": "",
+      "protected_constraint_ids": [
+        3
+      ]
+    }
+  ],
+  "open_questions": [
+    {
+      "question": "What rule or model threshold determines that a request is unambiguously shipping status?",
+      "artifact_ids": [
+        "BE-18"
+      ],
+      "suggested_owner": "Backend"
+    },
+    {
+      "question": "Should automatically sent replies remain visible in the agent queue or a separate activity view?",
+      "artifact_ids": [
+        "FE-12"
+      ],
+      "suggested_owner": "Frontend"
+    }
+  ]
+}

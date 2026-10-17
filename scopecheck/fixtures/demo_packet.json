@@ -1,0 +1,158 @@
+{
+  "synthetic": true,
+  "purpose": "Planning fixture only; not live customer data",
+  "change_request": {
+    "id": "CR-001",
+    "title": "Allow limited automatic shipping replies",
+    "proposed_change": "Allow the assistant to send routine shipping-status replies automatically only after successful order lookup. Refund requests and account-security requests must still be reviewed and sent by a support agent. If order lookup fails or intent is uncertain, route the draft for human review. Keep the billing receipt service unchanged.",
+    "protected_constraints": [
+      "Refunds remain human-reviewed.",
+      "Account-security requests remain human-reviewed.",
+      "Missing order data or uncertain intent requires human review.",
+      "The separate billing receipt service is unchanged."
+    ],
+    "boundary_note": "This is a proposed change for planning review. It does not authorize sending messages or changing a real product."
+  },
+  "artifacts": [
+    {
+      "id": "PRD-01",
+      "title": "Support assistant baseline",
+      "kind": "prd",
+      "owner": "Product",
+      "feature_id": "F-SUPPORT",
+      "sections": [
+        {
+          "id": "P1",
+          "text": "The assistant drafts responses for a support agent. Every customer-facing answer requires approval by a support agent before sending."
+        },
+        {
+          "id": "P2",
+          "text": "The product supports shipping-status questions, refund requests, and account-security questions."
+        },
+        {
+          "id": "P3",
+          "text": "A support agent remains accountable for customer-facing response policy. Changes to automation require product and engineering review."
+        }
+      ]
+    },
+    {
+      "id": "FE-12",
+      "title": "Draft review screen",
+      "kind": "ticket",
+      "owner": "Frontend",
+      "feature_id": "F-SUPPORT",
+      "sections": [
+        {
+          "id": "F1",
+          "text": "Every generated response appears in the agent review queue. The send control remains disabled until a support agent chooses Approve."
+        },
+        {
+          "id": "F2",
+          "text": "The interface shows the customer question, generated draft, and linked order information when available."
+        }
+      ]
+    },
+    {
+      "id": "BE-18",
+      "title": "Outbound response worker",
+      "kind": "ticket",
+      "owner": "Backend",
+      "feature_id": "F-SUPPORT",
+      "sections": [
+        {
+          "id": "B1",
+          "text": "The outbound worker rejects every customer-support message when approval_id is missing."
+        },
+        {
+          "id": "B2",
+          "text": "Successful order lookup returns delivery_status and order_id. A failed lookup returns ORDER_NOT_FOUND."
+        },
+        {
+          "id": "B3",
+          "text": "The response record stores request_id, response_id, approval_id, and sent_at."
+        }
+      ]
+    },
+    {
+      "id": "QA-09",
+      "title": "Response sending acceptance tests",
+      "kind": "test",
+      "owner": "QA",
+      "feature_id": "F-SUPPORT",
+      "sections": [
+        {
+          "id": "Q1",
+          "text": "Given any support request, when approval_id is absent, then sending must fail."
+        },
+        {
+          "id": "Q2",
+          "text": "Given a refund request, the response is sent only after a support agent approves it."
+        },
+        {
+          "id": "Q3",
+          "text": "Given an account-security request, the response is sent only after a support agent approves it."
+        }
+      ]
+    },
+    {
+      "id": "DATA-04",
+      "title": "Response reporting",
+      "kind": "analytics",
+      "owner": "Analytics",
+      "feature_id": "F-SUPPORT",
+      "sections": [
+        {
+          "id": "A1",
+          "text": "Every response_sent event requires reviewer_id. Events without reviewer_id are rejected."
+        },
+        {
+          "id": "A2",
+          "text": "Current reporting measures approval-to-send time for all responses. The event has no field describing whether the response was sent automatically or reviewed by a human."
+        }
+      ]
+    },
+    {
+      "id": "POL-02",
+      "title": "Refund handling rule",
+      "kind": "policy",
+      "owner": "Support operations",
+      "feature_id": "F-SUPPORT",
+      "sections": [
+        {
+          "id": "R1",
+          "text": "Refund responses must be approved and sent by a support agent. The assistant must not authorize or issue a refund."
+        }
+      ]
+    },
+    {
+      "id": "POL-03",
+      "title": "Account security rule",
+      "kind": "policy",
+      "owner": "Security",
+      "feature_id": "F-SUPPORT",
+      "sections": [
+        {
+          "id": "S1",
+          "text": "Account-security responses require support-agent approval before sending. Identity-verification steps are unchanged."
+        }
+      ]
+    },
+    {
+      "id": "BILL-07",
+      "title": "Billing receipts",
+      "kind": "ticket",
+      "owner": "Billing",
+      "feature_id": "F-BILLING",
+      "sections": [
+        {
+          "id": "I1",
+          "text": "Automatically send invoice receipts after successful payment. This billing service is separate from customer-support messages."
+        },
+        {
+          "id": "I2",
+          "text": "Receipt delivery records contain payment_id and receipt_id. No support-agent approval is required."
+        }
+      ]
+    }
+  ]
+}
