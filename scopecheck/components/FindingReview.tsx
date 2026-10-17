@@ -26,7 +26,7 @@ type Props = {
 
 // Right pane: summary counts, the finding list, and the selected finding's detail.
 export function FindingReview(props: Props) {
-  const { result, artifacts, review, reviewerRole, onReviewerRole, selectedId, onSelect } = props;
+  const { result, artifacts, review, selectedId, onSelect } = props;
   const byArtifact = new Map(artifacts.map((a) => [a.id, a]));
   const counts = Object.fromEntries(
     KIND_ORDER.map((k) => [k, result.findings.filter((f) => f.kind === k).length]),
@@ -48,16 +48,6 @@ export function FindingReview(props: Props) {
           </div>
         ))}
       </div>
-
-      <label className="flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2">
-        <span className="shrink-0 text-xs font-semibold uppercase tracking-wide text-slate-500">Your role</span>
-        <input
-          value={reviewerRole}
-          onChange={(e) => onReviewerRole(e.target.value)}
-          placeholder="e.g. PM, Engineering lead (needed to accept)"
-          className="w-full rounded border border-slate-300 p-1.5 text-sm"
-        />
-      </label>
 
       <ul className="divide-y divide-slate-200 overflow-hidden rounded-lg border border-slate-300 bg-white">
         {result.findings.map((f) => {
@@ -123,6 +113,7 @@ function FindingDetail({
   review,
   dispatch,
   reviewerRole,
+  onReviewerRole,
   result,
   onSelect,
   onFocusEvidence,
@@ -210,7 +201,20 @@ function FindingDetail({
         </div>
       )}
 
-      <div className="border-t border-slate-200 pt-3">
+      <div className="grid gap-3 border-t border-slate-200 pt-3 md:grid-cols-2">
+        <label className="block">
+          <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Your role <span className="normal-case text-slate-400">(needed to accept, kept for every finding)</span>
+          </span>
+          <input
+            value={reviewerRole}
+            onChange={(e) => onReviewerRole(e.target.value)}
+            placeholder="e.g. PM, Engineering lead"
+            className={`mt-1 w-full rounded border p-2 text-sm ${
+              reviewerRole.trim() ? "border-slate-300" : "border-amber-500 ring-2 ring-amber-200"
+            }`}
+          />
+        </label>
         <label className="block">
           <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Note</span>
           <input
@@ -237,7 +241,7 @@ function FindingDetail({
           );
         })}
         {!canDecide(reviewerRole, "accepted") && (
-          <span className="text-xs text-slate-500">Enter your role above to accept.</span>
+          <span className="text-xs text-slate-500">Enter your role to accept.</span>
         )}
         {r.status !== "pending" && r.reviewer_role && (
           <span className="text-xs text-slate-500">Decided by {r.reviewer_role}</span>
