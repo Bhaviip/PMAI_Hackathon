@@ -13,9 +13,12 @@ export type Impact = {
   evidence: string[];
 };
 
+export type PullRequest = { repo: string; number: number; author: string; branch: string };
+
 export type CodeChange = {
   id: string;
   title: string;
+  pr: PullRequest;
   summary: string;
   path: string;
   before: string;
@@ -145,6 +148,7 @@ export const changes: CodeChange[] = [
   {
     id: "auto-ship",
     title: "Auto-send shipping replies",
+    pr: { repo: "parcel-help/support-app", number: 482, author: "maya.dev", branch: "auto-ship-replies" },
     summary: "Let the assistant send shipping-status answers without an agent, once the order lookup succeeds.",
     path: "src/outbound/canSend.ts",
     before: `export function canSend(msg: OutboundMessage): boolean {
@@ -210,6 +214,7 @@ export const changes: CodeChange[] = [
   {
     id: "button-label",
     title: "Rename the Approve button",
+    pr: { repo: "parcel-help/support-app", number: 487, author: "jon.ui", branch: "approve-label" },
     summary: 'Change the review queue button text from "Approve" to "Approve & send".',
     path: "src/ui/ReviewQueue.tsx",
     before: `      {(m) => <Row msg={m} action={<Button>Approve</Button>} />}`,

@@ -1,54 +1,78 @@
 "use client";
 
-import type { CodeChange } from "@/fixtures/codeChangeDemo";
+import type { CodeChange, Level, ProjectFile } from "@/fixtures/codeChangeDemo";
 import { LEVELS, LEVEL_ORDER } from "@/lib/levels";
 
 type Props = {
   change: CodeChange;
+  kinds: Map<string, ProjectFile["kind"]>;
   selected: string | null;
+  focusLevel: Level | null;
   onSelect: (path: string) => void;
 };
 
-const W = 720;
-const H = 440;
+const W = 760;
+const H = 500;
 const CX = W / 2;
 const CY = H / 2;
-const NODE_W = 176;
-const NODE_H = 46;
+const NODE_W = 212;
+const NODE_H = 62;
+const KIND_TAG: Record<ProjectFile["kind"], string> = { code: "CODE", test: "TEST", doc: "DOC" };
 
 const fileName = (p: string) => p.split("/").pop() ?? p;
 
-// The changed file sits in the middle; every affected file is placed around it.
-export function ImpactMap({ change, selected, onSelect }: Props) {
+// The changed file sits in the middle; every affected file is placed around it,
+// most severe first, starting at the top and going clockwise.
+export function ImpactMap({ change, kinds, selected, focusLevel, onSelect }: Props) {
   const impacts = [...change.impacts].sort((a, b) => LEVEL_ORDER.indexOf(a.level) - LEVEL_ORDER.indexOf(b.level));
   const n = impacts.length;
   const nodes = impacts.map((imp, i) => {
     const angle = -Math.PI / 2 + (i / n) * Math.PI * 2;
-    return { imp, x: CX + Math.cos(angle) * 250, y: CY + Math.sin(angle) * 160 };
+    // Flatten the diagonals so neighbouring cards near the top and bottom don't overlap.
+    const sin = Math.sin(angle);
+    const y = Math.sign(sin) * Math.abs(sin) ** 1.6;
+    return { imp, x: CX + Math.cos(angle) * 254, y: CY + y * 186, angle };
   });
+  const dimmed = (level: Level) => focusLevel !== null && focusLevel !== level;
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full" role="img" aria-label="Map of files affected by the change">
-      {nodes.map(({ imp, x, y }) => (
-        <line
-          key={`e-${imp.path}`}
-          x1={CX}
-          y1={CY}
-          x2={x}
-          y2={y}
-          stroke={LEVELS[imp.level].stroke}
-          strokeWidth={selected === imp.path ? 4 : 2}
-          strokeDasharray={imp.level === "safe" ? "6 6" : undefined}
-          opacity={selected && selected !== imp.path ? 0.35 : 0.9}
-        />
-      ))}
+    <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full" role="group" aria-label="Map of files affected by the change">
+      <defs>
+        <pattern id="dots" width="18" height="18" patternUnits="userSpaceOnUse">
+          <circle cx="1.5" cy="1.5" r="1.2" fill="#e2e8f0" />
+        </pattern>
+        <filter id="shadow" x="-20%" y="-20%" width="140%" height="160%">
+          <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor="#0f172a" floodOpacity="0.08" />
+        </filter>
+      </defs>
+      <rect width={W} height={H} fill="url(#dots)" rx={16} />
 
-      <g>
-        <rect x={CX - 100} y={CY - 32} width={200} height={64} rx={14} fill="#0f172a" />
-        <text x={CX} y={CY - 6} textAnchor="middle" fill="#94a3b8" fontSize={11} fontWeight={600} letterSpacing={1}>
-          YOU CHANGED
+      {nodes.map(({ imp, x, y, angle }) => {
+        // Bend each edge slightly so the map reads as a network, not a wheel.
+        const mx = (CX + x) / 2 + Math.cos(angle + Math.PI / 2) * 22;
+        const my = (CY + y) / 2 + Math.sin(angle + Math.PI / 2) * 22;
+        const on = selected === imp.path;
+        return (
+          <path
+            key={`e-${imp.path}`}
+            d={`M ${CX} ${CY} Q ${mx} ${my} ${x} ${y}`}
+            fill="none"
+            stroke={LEVELS[imp.level].stroke}
+            strokeWidth={on ? 3 : 1.75}
+            strokeDasharray={imp.level === "safe" ? "5 6" : undefined}
+            strokeLinecap="round"
+            opacity={dimmed(imp.level) ? 0.15 : on ? 1 : 0.55}
+            className="transition-opacity"
+          />
+        );
+      })}
+
+      <g filter="url(#shadow)">
+        <rect x={CX - 112} y={CY - 38} width={224} height={76} rx={16} fill="#4f46e5" />
+        <text x={CX} y={CY - 9} textAnchor="middle" fill="#c7d2fe" fontSize={10.5} fontWeight={700} letterSpacing={1.2}>
+          CHANGED IN #{change.pr.number}
         </text>
-        <text x={CX} y={CY + 16} textAnchor="middle" fill="#fff" fontSize={15} fontWeight={700} fontFamily="ui-monospace, monospace">
+        <text x={CX} y={CY + 16} textAnchor="middle" fill="#fff" fontSize={16} fontWeight={700} fontFamily="ui-monospace, SFMono-Regular, Menlo, monospace">
           {fileName(change.path)}
         </text>
       </g>
@@ -56,31 +80,38 @@ export function ImpactMap({ change, selected, onSelect }: Props) {
       {nodes.map(({ imp, x, y }) => {
         const s = LEVELS[imp.level];
         const on = selected === imp.path;
+        const kind = kinds.get(imp.path) ?? "code";
+        const left = x - NODE_W / 2;
+        const top = y - NODE_H / 2;
         return (
           <g
             key={imp.path}
             onClick={() => onSelect(imp.path)}
-            onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onSelect(imp.path)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onSelect(imp.path);
+              }
+            }}
             tabIndex={0}
             role="button"
+            aria-pressed={on}
             aria-label={`${imp.path}: ${s.label}`}
-            className="cursor-pointer outline-none"
+            className="cursor-pointer outline-none transition-opacity focus-visible:[&>rect:first-of-type]:stroke-indigo-500"
+            opacity={dimmed(imp.level) ? 0.35 : 1}
+            filter="url(#shadow)"
           >
-            <rect
-              x={x - NODE_W / 2}
-              y={y - NODE_H / 2}
-              width={NODE_W}
-              height={NODE_H}
-              rx={10}
-              fill={s.fill}
-              stroke={s.stroke}
-              strokeWidth={on ? 3.5 : 1.5}
-            />
-            <text x={x} y={y - 4} textAnchor="middle" fontSize={13} fontWeight={600} fill="#0f172a" fontFamily="ui-monospace, monospace">
+            <rect x={left} y={top} width={NODE_W} height={NODE_H} rx={12} fill={on ? s.tint : "#fff"} stroke={on ? s.stroke : "#e2e8f0"} strokeWidth={on ? 2.5 : 1} />
+            <rect x={left} y={top} width={6} height={NODE_H} rx={3} fill={s.stroke} />
+            <text x={left + 18} y={top + 25} fontSize={10.5} fontWeight={700} fill="#94a3b8" letterSpacing={0.8}>
+              {KIND_TAG[kind]}
+            </text>
+            <text x={left + 18 + KIND_TAG[kind].length * 8.2 + 7} y={top + 25} fontSize={15} fontWeight={600} fill="#0f172a" fontFamily="ui-monospace, SFMono-Regular, Menlo, monospace">
               {fileName(imp.path)}
             </text>
-            <text x={x} y={y + 13} textAnchor="middle" fontSize={11} fontWeight={700} fill={s.stroke}>
-              {s.label.toUpperCase()}
+            <circle cx={left + 22} cy={top + 44} r={4.5} fill={s.stroke} />
+            <text x={left + 33} y={top + 48.5} fontSize={13.5} fontWeight={600} fill="#475569">
+              {s.label}
             </text>
           </g>
         );

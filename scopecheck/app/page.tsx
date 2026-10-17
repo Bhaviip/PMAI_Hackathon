@@ -1,121 +1,261 @@
 "use client";
 
 import { useState } from "react";
-import { changes, files } from "@/fixtures/codeChangeDemo";
+import { changes, files, type CodeChange, type Level } from "@/fixtures/codeChangeDemo";
 import { ImpactMap } from "@/components/ImpactMap";
 import { CodeView } from "@/components/CodeView";
-import { Badge } from "@/components/Badge";
+import { DiffView } from "@/components/DiffView";
 import { LEVELS, LEVEL_ORDER, locateEvidence } from "@/lib/levels";
 
+// Sidebar wording, e.g. "1 break", "3 breaks", "2 to update".
+const SHORT: Record<Level, (n: number) => string> = {
+  breaks: (n) => (n === 1 ? "break" : "breaks"),
+  update: () => "to update",
+  check: () => "to check",
+  safe: () => "safe",
+};
+
 const fileByPath = new Map(files.map((f) => [f.path, f]));
+const kinds = new Map(files.map((f) => [f.path, f.kind]));
+
+// Impacts in the order the map and the evidence stepper show them: most severe first.
+const ordered = (c: CodeChange) =>
+  [...c.impacts].sort((a, b) => LEVEL_ORDER.indexOf(a.level) - LEVEL_ORDER.indexOf(b.level));
+
+const countLevels = (c: CodeChange) =>
+  Object.fromEntries(LEVEL_ORDER.map((l) => [l, c.impacts.filter((i) => i.level === l).length])) as Record<Level, number>;
 
 export default function Home() {
   const [changeId, setChangeId] = useState(changes[0].id);
   const change = changes.find((c) => c.id === changeId) ?? changes[0];
-  const [selected, setSelected] = useState<string | null>(change.impacts[0]?.path ?? null);
+  const impacts = ordered(change);
+  const [selected, setSelected] = useState<string | null>(impacts[0]?.path ?? null);
+  const [focusLevel, setFocusLevel] = useState<Level | null>(null);
 
   function pickChange(id: string) {
-    const next = changes.find((c) => c.id === id);
+    const next = changes.find((c) => c.id === id) ?? changes[0];
     setChangeId(id);
-    setSelected(next?.impacts[0]?.path ?? null);
+    setSelected(ordered(next)[0]?.path ?? null);
+    setFocusLevel(null);
   }
 
-  const impact = change.impacts.find((i) => i.path === selected) ?? null;
+  const counts = countLevels(change);
+  const index = impacts.findIndex((i) => i.path === selected);
+  const impact = impacts[index] ?? null;
   const file = impact ? fileByPath.get(impact.path) : undefined;
   const evidence = impact && file ? locateEvidence(file.code, impact.evidence) : null;
-  const counts = Object.fromEntries(
-    LEVEL_ORDER.map((l) => [l, change.impacts.filter((i) => i.level === l).length]),
-  ) as Record<string, number>;
+  const step = (d: number) => setSelected(impacts[(index + d + impacts.length) % impacts.length].path);
 
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-900">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-6 gap-y-2 px-5 py-4">
-          <div>
-            <h1 className="text-2xl font-black tracking-tight">ScopeCheck</h1>
-            <p className="text-sm text-slate-500">See what a code change touches, with proof.</p>
-          </div>
-          <span className="ml-auto rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-900 ring-1 ring-amber-300">
-            Demo project · sample analysis, not live
+    <div className="min-h-screen bg-slate-50 text-slate-900">
+      <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/90 backdrop-blur">
+        <div className="mx-auto flex h-14 max-w-[1400px] items-center gap-3 px-4 sm:px-6">
+          <span className="grid h-8 w-8 place-items-center rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 text-sm font-black text-white">
+            S
+          </span>
+          <span className="text-[15px] font-bold tracking-tight">ScopeCheck</span>
+          <span className="hidden text-slate-300 sm:inline">/</span>
+          <span className="hidden truncate font-mono text-sm text-slate-500 sm:inline">{change.pr.repo}</span>
+          <span className="ml-auto inline-flex shrink-0 items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800 ring-1 ring-amber-200">
+            <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+            Sample data
           </span>
         </div>
       </header>
 
-      <main className="mx-auto max-w-7xl space-y-5 px-5 py-5">
-        <section aria-label="Pick a change" className="flex flex-wrap gap-3">
-          {changes.map((c) => (
-            <button
-              key={c.id}
-              type="button"
-              onClick={() => pickChange(c.id)}
-              aria-pressed={c.id === change.id}
-              className={`rounded-xl px-4 py-3 text-left ring-1 transition ${
-                c.id === change.id
-                  ? "bg-slate-900 text-white ring-slate-900"
-                  : "bg-white text-slate-800 ring-slate-200 hover:ring-slate-400"
-              }`}
-            >
-              <div className="font-semibold">{c.title}</div>
-              <div className={`text-xs ${c.id === change.id ? "text-slate-300" : "text-slate-500"}`}>
-                {c.impacts.length} files touched
-              </div>
-            </button>
-          ))}
-        </section>
+      <div className="mx-auto grid max-w-[1400px] gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[260px_minmax(0,1fr)]">
+        <aside className="min-w-0">
+          <h2 className="px-1 text-xs font-semibold uppercase tracking-wider text-slate-400">Pull requests</h2>
+          <ul className="mt-3 space-y-2">
+            {changes.map((c) => {
+              const k = countLevels(c);
+              const on = c.id === change.id;
+              return (
+                <li key={c.id}>
+                  <button
+                    type="button"
+                    onClick={() => pickChange(c.id)}
+                    aria-pressed={on}
+                    className={`w-full rounded-xl px-3.5 py-3 text-left transition ${
+                      on ? "bg-white shadow-sm ring-2 ring-indigo-500" : "ring-1 ring-slate-200 hover:bg-white"
+                    }`}
+                  >
+                    <div className="flex items-baseline gap-2">
+                      <span className="font-mono text-xs text-slate-400">#{c.pr.number}</span>
+                      <span className="truncate text-sm font-semibold">{c.title}</span>
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500">
+                      {LEVEL_ORDER.filter((l) => l !== "safe" && k[l] > 0).map((l) => (
+                        <span key={l} className="inline-flex items-center gap-1">
+                          <span className={`h-1.5 w-1.5 rounded-full ${LEVELS[l].dot}`} />
+                          {k[l]} {SHORT[l](k[l])}
+                        </span>
+                      ))}
+                    </div>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </aside>
 
-        <div className="grid gap-5 lg:grid-cols-2">
-          <section className="space-y-4 rounded-2xl bg-white p-5 ring-1 ring-slate-200 min-w-0">
-            <div>
-              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400">The change</h2>
-              <p className="mt-1 text-slate-800">{change.summary}</p>
-              <p className="mt-2 font-mono text-xs text-slate-500">{change.path}</p>
+        <main className="min-w-0 space-y-6">
+          <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200 sm:p-6">
+            <div className="flex flex-wrap items-start gap-4">
+              <div className="min-w-0 flex-1">
+                <h1 className="text-xl font-bold tracking-tight sm:text-2xl">
+                  {change.title} <span className="font-normal text-slate-400">#{change.pr.number}</span>
+                </h1>
+                <p className="mt-1 text-sm text-slate-500">
+                  <span className="font-medium text-slate-700">{change.pr.author}</span> wants to merge{" "}
+                  <span className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs">{change.pr.branch}</span> into{" "}
+                  <span className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs">main</span>
+                </p>
+              </div>
+              <Verdict breaks={counts.breaks} touched={change.impacts.length - counts.safe} />
             </div>
-            <div className="space-y-2">
-              <div className="text-xs font-semibold text-rose-700">Before</div>
-              <CodeView lines={change.before.split("\n")} tone="removed" />
-              <div className="text-xs font-semibold text-emerald-700">After</div>
-              <CodeView lines={change.after.split("\n")} tone="added" />
+            <p className="mt-4 text-[15px] text-slate-700">{change.summary}</p>
+
+            <div className="mt-5 grid gap-5 xl:grid-cols-2">
+              <div className="grid grid-cols-2 gap-3 self-start sm:grid-cols-4 xl:grid-cols-2">
+                {LEVEL_ORDER.map((l) => {
+                  const on = focusLevel === l;
+                  return (
+                    <button
+                      key={l}
+                      type="button"
+                      onClick={() => setFocusLevel(on ? null : l)}
+                      aria-pressed={on}
+                      disabled={counts[l] === 0}
+                      className={`rounded-xl p-3 text-left ring-1 transition disabled:opacity-40 ${
+                        on ? `${LEVELS[l].pill} ring-2` : "bg-white ring-slate-200 hover:ring-slate-300"
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 text-xs font-medium text-slate-500">
+                        <span className={`h-2 w-2 rounded-full ${LEVELS[l].dot}`} />
+                        {LEVELS[l].label}
+                      </div>
+                      <div className="mt-1 text-2xl font-bold tabular-nums">{counts[l]}</div>
+                    </button>
+                  );
+                })}
+              </div>
+              <DiffView path={change.path} before={change.before} after={change.after} />
             </div>
-            <div className="grid grid-cols-4 gap-2 pt-1">
-              {LEVEL_ORDER.map((l) => (
-                <div key={l} className={`rounded-lg px-2 py-2 text-center ring-1 ring-inset ${LEVELS[l].chip}`}>
-                  <div className="text-2xl font-black">{counts[l]}</div>
-                  <div className="text-[11px] font-semibold leading-tight">{LEVELS[l].label}</div>
+          </section>
+
+          <div className="grid gap-6 xl:grid-cols-12">
+            <section className="min-w-0 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200 xl:col-span-7">
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <h2 className="font-semibold">Impact map</h2>
+                {focusLevel ? (
+                  <button type="button" onClick={() => setFocusLevel(null)} className="text-xs font-medium text-indigo-600 hover:underline">
+                    Show all
+                  </button>
+                ) : (
+                  <span className="text-xs text-slate-400">Click a file to see the proof</span>
+                )}
+              </div>
+              <ImpactMap change={change} kinds={kinds} selected={selected} focusLevel={focusLevel} onSelect={setSelected} />
+            </section>
+
+            {impact && (
+              <section
+                className="min-w-0 self-start rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200 xl:sticky xl:top-20 xl:col-span-5"
+                aria-label="Evidence"
+                aria-live="polite"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400">Proof</h2>
+                  <div className="flex items-center gap-1">
+                    <span className="mr-1 text-xs tabular-nums text-slate-400">
+                      {index + 1} of {impacts.length}
+                    </span>
+                    <StepButton label="Previous file" onClick={() => step(-1)} d="M10 4 6 8l4 4" />
+                    <StepButton label="Next file" onClick={() => step(1)} d="m6 4 4 4-4 4" />
+                  </div>
                 </div>
-              ))}
-            </div>
-          </section>
-
-          <section className="rounded-2xl bg-white p-5 ring-1 ring-slate-200 min-w-0">
-            <div className="flex items-baseline justify-between">
-              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400">What it affects</h2>
-              <span className="text-xs text-slate-400">Click a file to see the evidence</span>
-            </div>
-            <ImpactMap change={change} selected={selected} onSelect={setSelected} />
-          </section>
-        </div>
-
-        {impact && (
-          <section className="min-w-0 rounded-2xl bg-white p-5 ring-1 ring-slate-200" aria-label="Evidence">
-            <div className="flex flex-wrap items-center gap-3">
-              <Badge className={LEVELS[impact.level].chip}>{LEVELS[impact.level].label}</Badge>
-              <span className="font-mono text-sm font-semibold">{impact.path}</span>
-              <span className="text-xs text-slate-400">{LEVELS[impact.level].hint}</span>
-            </div>
-            <p className="mt-2 text-lg text-slate-800">{impact.why}</p>
-            {evidence && (
-              <div className="mt-3">
-                <CodeView lines={evidence.lines} highlight={evidence.found} />
-              </div>
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ${LEVELS[impact.level].pill}`}>
+                    <span className={`h-1.5 w-1.5 rounded-full ${LEVELS[impact.level].dot}`} />
+                    {LEVELS[impact.level].label}
+                  </span>
+                  <span className="truncate font-mono text-sm font-medium">{impact.path}</span>
+                </div>
+                <p className="mt-3 text-base font-medium leading-snug text-slate-800">{impact.why}</p>
+                {evidence && (
+                  <div className="mt-4">
+                    <CodeView lines={evidence.lines} highlight={evidence.found} />
+                  </div>
+                )}
+                {(!file || (evidence && evidence.missing.length > 0)) && (
+                  <p className="mt-3 text-sm font-medium text-rose-700">
+                    Proof not found in the file, so this impact is unverified.
+                  </p>
+                )}
+              </section>
             )}
-            {(!file || (evidence && evidence.missing.length > 0)) && (
-              <p className="mt-2 text-sm font-semibold text-rose-700">
-                Evidence could not be found in the file, so this impact is not verified.
-              </p>
-            )}
-          </section>
-        )}
-      </main>
+          </div>
+
+          <HowItWorks />
+        </main>
+      </div>
     </div>
+  );
+}
+
+function Verdict({ breaks, touched }: { breaks: number; touched: number }) {
+  const risky = breaks > 0;
+  return (
+    <div
+      className={`shrink-0 rounded-xl px-4 py-2.5 ring-1 ${
+        risky ? "bg-rose-50 text-rose-800 ring-rose-200" : "bg-emerald-50 text-emerald-800 ring-emerald-200"
+      }`}
+    >
+      <div className="text-xs font-medium opacity-75">{risky ? "Not safe to merge yet" : "Looks safe"}</div>
+      <div className="text-lg font-bold">
+        {risky ? `${breaks} file${breaks === 1 ? "" : "s"} will break` : "Nothing breaks"}
+      </div>
+      <div className="text-xs opacity-75">{touched} files need attention</div>
+    </div>
+  );
+}
+
+function StepButton({ label, onClick, d }: { label: string; onClick: () => void; d: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      className="grid h-7 w-7 place-items-center rounded-lg text-slate-500 ring-1 ring-slate-200 hover:bg-slate-50 hover:text-slate-900"
+    >
+      <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+        <path d={d} />
+      </svg>
+    </button>
+  );
+}
+
+const STEPS = [
+  { title: "Connect a repo", body: "Install ScopeCheck on GitHub once." },
+  { title: "Open a pull request", body: "ScopeCheck reads the diff and the code around it." },
+  { title: "See the impact", body: "Every affected file, with the lines that prove it." },
+];
+
+function HowItWorks() {
+  return (
+    <section aria-label="How it works" className="grid gap-3 sm:grid-cols-3">
+      {STEPS.map((s, i) => (
+        <div key={s.title} className="flex gap-3 rounded-2xl bg-white p-4 ring-1 ring-slate-200">
+          <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-indigo-50 text-sm font-bold text-indigo-600">
+            {i + 1}
+          </span>
+          <div>
+            <div className="text-sm font-semibold">{s.title}</div>
+            <div className="text-sm text-slate-500">{s.body}</div>
+          </div>
+        </div>
+      ))}
+    </section>
   );
 }
