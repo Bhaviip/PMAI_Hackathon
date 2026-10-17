@@ -86,9 +86,15 @@ export default function Home() {
           {current && (
             <span
               className="ml-auto shrink-0 text-[13px] text-muted"
-              title={isSample ? "A made-up project with a hand-written analysis." : "Found by matching changed names and values across your files."}
+              title={
+                isSample
+                  ? "A made-up project with a hand-written analysis."
+                  : change.review?.status === "ai"
+                    ? "A keyword scan found candidate files; an AI model judged each one, and every quoted line was checked against the file."
+                    : "Found by matching changed names and values across your files."
+              }
             >
-              {isSample ? "Sample data" : "Your code · keyword scan"}
+              {isSample ? "Sample data" : change.review?.status === "ai" ? `Your code · AI-checked · ${change.review.model}` : "Your code · keyword scan"}
             </span>
           )}
         </div>
@@ -127,6 +133,7 @@ export default function Home() {
                 </h1>
                 <Verdict breaks={counts.breaks} touched={change.impacts.length - counts.safe} />
                 <p className="mt-3 max-w-[70ch] text-[15px] leading-relaxed text-muted">{change.summary}</p>
+                <ReviewNote change={change} />
               </section>
 
               <section>
@@ -197,6 +204,12 @@ export default function Home() {
                         <span className={`font-medium ${LEVELS[impact.level].text}`}>{LEVELS[impact.level].label}</span>
                         <span className="text-muted"> · {LEVELS[impact.level].hint}</span>
                       </p>
+                      {impact.source && (
+                        <p className="mt-1 text-[12px] text-faint">
+                          {impact.source === "ai" ? "AI-checked" : "Keyword match, not AI-checked"}
+                          {impact.scanLevel && impact.scanLevel !== impact.level && ` · keyword scan said ${LEVELS[impact.scanLevel].label}`}
+                        </p>
+                      )}
                       <p className="mt-1 break-all font-mono text-[13px]">{impact.path}</p>
                       <p className="mt-4 font-serif text-[21px] leading-snug">{impact.why}</p>
                       {evidence && (
@@ -222,6 +235,31 @@ export default function Home() {
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return <h2 className="mb-3 font-serif text-[22px] font-semibold tracking-tight">{children}</h2>;
+}
+
+// Under the summary on your own changes: the AI's one-line take, or why the AI check
+// didn't run, so keyword-only results are never mistaken for AI-checked ones.
+function ReviewNote({ change }: { change: CodeChange }) {
+  const r = change.review;
+  if (!r) return null;
+  if (r.status === "ai") {
+    return (
+      <p className="mt-3 max-w-[70ch] text-[14px] leading-relaxed">
+        <span className="font-medium">AI check:</span> {r.summary}
+        {r.withheld > 0 && (
+          <span className="text-muted">
+            {" "}
+            ({r.withheld} verdict{r.withheld === 1 ? "" : "s"} not used because the quoted proof wasn&apos;t in the file.)
+          </span>
+        )}
+      </p>
+    );
+  }
+  return (
+    <p className="mt-3 max-w-[70ch] rounded-md bg-ochre-50 px-3 py-2 text-[14px] text-ochre">
+      AI check didn&apos;t run: {r.reason} These are keyword matches only.
+    </p>
+  );
 }
 
 // One-sentence summary under the title, e.g. "2 files will break."

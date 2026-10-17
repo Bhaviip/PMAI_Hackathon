@@ -47,11 +47,42 @@ const literals = (line: string) =>
   [...line.matchAll(/["'`]([^"'`\n]{3,60})["'`]|>([^<>{}\n]{3,60})</g)]
     .map((m) => (m[1] ?? m[2]).trim())
     .filter((t) => /[A-Za-z]/.test(t));
+// The line with quoted text blanked out. Words inside strings, such as a test's
+// name ("does not call parseJson"), are prose, not names other files can use;
+// string values are picked up separately by literals().
+const withoutStrings = (line: string) => line.replace(/(["'`])(?:\\.|(?!\1)[^\\\n])*\1/g, '""');
 // Names being declared on the line, e.g. "canSend" in "function canSend(".
 const definitions = (line: string) =>
   [...line.matchAll(/\b(?:function|class|const|let|var|def|type|interface|enum)\s+([A-Za-z_$][\w$]*)/g)].map((m) => m[1]);
+// Only top-level or exported declarations are visible to other files. A local
+// variable inside a function or test body, like "const server = ...", is not.
+const topLevel = (line: string) => /^\S/.test(line) || /^\s*export\b/.test(line);
 
 const COMMENT_RE = /^\s*(\/\/|#|\*|\/\*|<!--|--\s)/;
+
+// Lines inside /* ... */ blocks and Python """docstrings""". Doc comments often
+// have lines with no leading "*", which COMMENT_RE alone would read as code, so
+// plain words like "throws" in a description would look like removed names.
+export function blockCommentLines(text: string): Set<string> {
+  const out = new Set<string>();
+  let closer: string | null = null;
+  for (const line of text.split("\n")) {
+    if (closer) {
+      out.add(line);
+      if (line.includes(closer)) closer = null;
+      continue;
+    }
+    const opener = line.match(/\/\*|"""|'''/);
+    if (!opener) continue;
+    const close = opener[0] === "/*" ? "*/" : opener[0];
+    // Still open at the end of this line when the closer doesn't follow the opener.
+    if (!line.slice(opener.index! + opener[0].length).includes(close)) {
+      out.add(line);
+      closer = close;
+    }
+  }
+  return out;
+}
 // camelCase, snake_case, PascalCase with an inner capital, or containing a digit.
 const codeLike = (w: string) => /[a-z][A-Z]|_|[A-Za-z]\d|^[A-Z][a-z]+[A-Z]/.test(w);
 
@@ -82,8 +113,9 @@ function signalsFor(edit: Edit): Signal[] {
   };
   // Prose (docs, comments) only contributes names that look like code, e.g. canSend or approval_id.
   const prose = kindOf(edit.path) === "doc";
+  const blockComments = new Set([...blockCommentLines(edit.before), ...blockCommentLines(edit.after)]);
   for (const d of changed) {
-    const comment = prose || COMMENT_RE.test(d.text);
+    const comment = prose || COMMENT_RE.test(d.text) || blockComments.has(d.text);
     if (comment) {
       for (const w of words(d.text).filter(codeLike)) {
         const gone = d.type === "del" && !new RegExp(`\\b${escape(w)}\\b`).test(afterText);
@@ -91,13 +123,13 @@ function signalsFor(edit: Edit): Signal[] {
       }
       continue;
     }
-    for (const def of definitions(d.text)) put(def, "defined");
+    if (topLevel(d.text)) for (const def of definitions(d.text)) put(def, "defined");
     for (const lit of literals(d.text)) {
       // An old value that no longer appears as a whole value is a removal: anything still using it is stale.
       const gone = d.type === "del" && !literals(afterText).includes(lit);
       put(lit, gone ? "removed" : "literal");
     }
-    for (const w of words(d.text)) {
+    for (const w of words(withoutStrings(d.text))) {
       const gone = d.type === "del" && !new RegExp(`\\b${escape(w)}\\b`).test(afterText);
       if (gone || codeLike(w)) put(w, gone ? "removed" : "used");
     }
@@ -105,7 +137,11 @@ function signalsFor(edit: Edit): Signal[] {
   if (prose) return [...out].map(([token, strength]) => ({ token, strength }));
   // The function or class that contains a changed line has changed behavior, so its callers matter.
   for (const name of enclosingDefinitions(diff)) put(name, "defined");
-  return [...out].map(([token, strength]) => ({ token, strength }));
+  const signals = [...out].map(([token, strength]) => ({ token, strength }));
+  // Other files depend on a test file only through names it removes or exports. Its
+  // strings and the names it merely uses are test data, like "https://example.com".
+  if (kindOf(edit.path) === "test") return signals.filter((s) => s.strength === "removed" || s.strength === "defined");
+  return signals;
 }
 
 // Function, class or method that opens on this line, if any.
@@ -121,7 +157,8 @@ function functionName(line: string): string | null {
 const indent = (line: string) => line.length - line.trimStart().length;
 
 // Walks the diff in "after" order and, for each changed line, finds the nearest
-// earlier definition that is less indented than it.
+// earlier top-level definition that is less indented than it. Nested functions
+// and test callbacks are skipped: other files can't call them by name.
 function enclosingDefinitions(diff: ReturnType<typeof diffLines>): string[] {
   const names = new Set<string>();
   diff.forEach((d, i) => {
@@ -130,7 +167,7 @@ function enclosingDefinitions(diff: ReturnType<typeof diffLines>): string[] {
       const prev = diff[j];
       if (prev.type === "del" || !prev.text.trim() || indent(prev.text) >= indent(d.text)) continue;
       const name = functionName(prev.text);
-      if (name) {
+      if (name && topLevel(prev.text)) {
         names.add(name);
         break;
       }

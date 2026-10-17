@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import type { CodeChange, ProjectFile } from "@/fixtures/codeChangeDemo";
 import { analyze } from "@/lib/analyze";
+import { runAiReview } from "@/lib/aiReview";
 import { diffLines } from "@/lib/diff";
 import { MAX_FILES, readFolder, readPullRequest } from "@/lib/sources";
 
@@ -53,6 +54,7 @@ function FolderFlow({ onDone }: { onDone: (a: Analysis) => void }) {
   const [draft, setDraft] = useState("");
   const [title, setTitle] = useState("");
   const [filter, setFilter] = useState("");
+  const [checking, setChecking] = useState(false);
 
   // The chosen file as uploaded, compared with the visitor's draft to count changed lines.
   const original = project?.files.find((f) => f.path === path)?.code ?? "";
@@ -74,9 +76,9 @@ function FolderFlow({ onDone }: { onDone: (a: Analysis) => void }) {
     setDraft(project?.files.find((f) => f.path === p)?.code ?? "");
   }
 
-  function run() {
+  async function run() {
     if (!project || !path) return;
-    const change = analyze({
+    const scanned = analyze({
       id: `local-${Date.now()}`,
       title: title.trim() || `Edit to ${path.split("/").pop()}`,
       summary: `Your edit to ${path}, checked against ${project.files.length} files in ${project.name}.`,
@@ -84,6 +86,9 @@ function FolderFlow({ onDone }: { onDone: (a: Analysis) => void }) {
       files: project.files,
       edits: [{ path, before: original, after: draft }],
     });
+    setChecking(true);
+    const change = await runAiReview(scanned, project.files);
+    setChecking(false);
     onDone({ change, files: project.files });
   }
 
@@ -173,11 +178,11 @@ function FolderFlow({ onDone }: { onDone: (a: Analysis) => void }) {
             />
             <button
               type="button"
-              disabled={!changedLines}
+              disabled={!changedLines || checking}
               onClick={run}
               className="rounded-lg bg-ink px-5 py-2 text-sm font-semibold text-white hover:bg-accent disabled:opacity-40"
             >
-              Find affected files
+              {checking ? "Checking with AI…" : "Find affected files"}
             </button>
           </div>
         </Step>
@@ -199,7 +204,9 @@ function GithubFlow({ onDone }: { onDone: (a: Analysis) => void }) {
     try {
       const pr = await readPullRequest(url, setBusy);
       setBusy("Scanning for affected files");
-      const change = analyze({ id: `gh-${Date.now()}`, ...pr });
+      const scanned = analyze({ id: `gh-${Date.now()}`, ...pr });
+      setBusy(`Checking ${scanned.impacts.length} files with AI`);
+      const change = await runAiReview(scanned, pr.files);
       onDone({ change, files: pr.files });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong reading that pull request.");
