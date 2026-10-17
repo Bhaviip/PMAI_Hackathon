@@ -1,11 +1,12 @@
 "use client";
 
-// The whole app is this one page. Left sidebar: "Analyze your code" plus the list
-// of changes (yours first, then the two samples). Main area, for the chosen change:
+// The whole app is this one page. Left sidebar: "Analyze your code", the How To
+// steps, and the list of changes (yours first, then the two samples). Main area,
+// for the chosen change, top to bottom:
 //   header      - pull request details, title and the overall verdict
-//   The change  - the diff of the edited files (DiffView)
 //   What it affects - the map and list of affected files (ImpactMap)
 //   Proof       - the selected file's reason and highlighted evidence lines (CodeView)
+//   The change  - the diff of the edited files (DiffView)
 // Choosing "Analyze your code" swaps the main area for NewAnalysis.
 // All state lives in memory, so a page refresh clears your own analyses.
 
@@ -86,9 +87,15 @@ export default function Home() {
           {current && (
             <span
               className="ml-auto shrink-0 text-[13px] text-muted"
-              title={isSample ? "A made-up project with a hand-written analysis." : "Found by matching changed names and values across your files."}
+              title={
+                isSample
+                  ? "A made-up project with a hand-written analysis."
+                  : change.review?.status === "ai"
+                    ? "A keyword scan found candidate files; an AI model judged each one, and every quoted line was checked against the file."
+                    : "Found by matching changed names and values across your files."
+              }
             >
-              {isSample ? "Sample data" : "Your code · keyword scan"}
+              {isSample ? "Sample data" : change.review?.status === "ai" ? `Your code · AI-checked · ${change.review.model}` : "Your code · keyword scan"}
             </span>
           )}
         </div>
@@ -106,8 +113,9 @@ export default function Home() {
           >
             Analyze your code →
           </button>
+          <HowTo />
           {mine.length > 0 && <ChangeList title="Your changes" items={mine} activeId={changeId} onPick={show} />}
-          <ChangeList title="Sample pull requests" items={samples} activeId={changeId} onPick={show} />
+          <ChangeList title="Samples · hand-written, no AI" items={samples} activeId={changeId} onPick={show} />
         </aside>
 
         <main className="min-w-0">
@@ -127,13 +135,10 @@ export default function Home() {
                 </h1>
                 <Verdict breaks={counts.breaks} touched={change.impacts.length - counts.safe} />
                 <p className="mt-3 max-w-[70ch] text-[15px] leading-relaxed text-muted">{change.summary}</p>
+                <ReviewNote change={change} />
               </section>
 
-              <section>
-                <SectionTitle>The change</SectionTitle>
-                <DiffView edits={change.edits} />
-              </section>
-
+              {/* The map and proof come first: they answer "what does this break?" at a glance. */}
               <div className="grid gap-10 xl:grid-cols-12 xl:gap-8">
                 <section className="min-w-0 xl:col-span-7">
                   <div className="flex flex-wrap items-baseline justify-between gap-x-6">
@@ -197,6 +202,12 @@ export default function Home() {
                         <span className={`font-medium ${LEVELS[impact.level].text}`}>{LEVELS[impact.level].label}</span>
                         <span className="text-muted"> · {LEVELS[impact.level].hint}</span>
                       </p>
+                      {impact.source && (
+                        <p className="mt-1 text-[12px] text-faint">
+                          {impact.source === "ai" ? "AI-checked" : "Keyword match, not AI-checked"}
+                          {impact.scanLevel && impact.scanLevel !== impact.level && ` · keyword scan said ${LEVELS[impact.scanLevel].label}`}
+                        </p>
+                      )}
                       <p className="mt-1 break-all font-mono text-[13px]">{impact.path}</p>
                       <p className="mt-4 font-serif text-[21px] leading-snug">{impact.why}</p>
                       {evidence && (
@@ -211,9 +222,13 @@ export default function Home() {
                   </section>
                 )}
               </div>
+
+              <section>
+                <SectionTitle>The change</SectionTitle>
+                <DiffView edits={change.edits} />
+              </section>
             </div>
           )}
-          <HowItWorks />
         </main>
       </div>
     </div>
@@ -222,6 +237,31 @@ export default function Home() {
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return <h2 className="mb-3 font-serif text-[22px] font-semibold tracking-tight">{children}</h2>;
+}
+
+// Under the summary on your own changes: the AI's one-line take, or why the AI check
+// didn't run, so keyword-only results are never mistaken for AI-checked ones.
+function ReviewNote({ change }: { change: CodeChange }) {
+  const r = change.review;
+  if (!r) return null;
+  if (r.status === "ai") {
+    return (
+      <p className="mt-3 max-w-[70ch] text-[14px] leading-relaxed">
+        <span className="font-medium">AI check:</span> {r.summary}
+        {r.withheld > 0 && (
+          <span className="text-muted">
+            {" "}
+            ({r.withheld} verdict{r.withheld === 1 ? "" : "s"} not used because the quoted proof wasn&apos;t in the file.)
+          </span>
+        )}
+      </p>
+    );
+  }
+  return (
+    <p className="mt-3 max-w-[70ch] rounded-md bg-ochre-50 px-3 py-2 text-[14px] text-ochre">
+      AI check didn&apos;t run: {r.reason} These are keyword matches only.
+    </p>
+  );
 }
 
 // One-sentence summary under the title, e.g. "2 files will break."
@@ -287,25 +327,28 @@ function StepButton({ label, onClick, children }: { label: string; onClick: () =
   );
 }
 
-// Footer explaining how the full product would plug into GitHub (not built yet).
-const STEPS = [
-  { title: "Connect a repo", body: "Install ScopeCheck on GitHub once." },
-  { title: "Open a pull request", body: "ScopeCheck reads the diff and the code around it." },
-  { title: "See the impact", body: "Every affected file, with the lines that prove it." },
+// Sidebar instructions for using this app.
+const HOW_TO = [
+  { title: "Pick a change", body: "Open a sample below, or click Analyze your code." },
+  { title: "Add your code", body: "Upload a project folder and edit a file, or paste a public GitHub pull request link." },
+  { title: "Read the map", body: "Each card is an affected file. Click one to see the lines that prove it." },
 ];
 
-function HowItWorks() {
+function HowTo() {
   return (
-    <section aria-label="How it works" className="mt-16 grid gap-6 border-t border-line pt-6 sm:grid-cols-3">
-      {STEPS.map((s, i) => (
-        <div key={s.title} className="flex gap-3">
-          <span className="font-serif text-[28px] font-semibold leading-none text-faint">{i + 1}</span>
-          <div>
-            <div className="text-sm font-medium">{s.title}</div>
-            <div className="text-sm text-muted">{s.body}</div>
-          </div>
-        </div>
-      ))}
+    <section aria-label="How To" className="mb-8">
+      <h2 className="mb-3 text-[12px] font-medium uppercase tracking-[0.08em] text-faint">How To</h2>
+      <ol className="space-y-3">
+        {HOW_TO.map((s, i) => (
+          <li key={s.title} className="flex gap-2.5">
+            <span className="font-serif text-[20px] font-semibold leading-none text-faint">{i + 1}</span>
+            <div>
+              <div className="text-[13px] font-medium leading-snug">{s.title}</div>
+              <div className="text-[12.5px] leading-snug text-muted">{s.body}</div>
+            </div>
+          </li>
+        ))}
+      </ol>
     </section>
   );
 }

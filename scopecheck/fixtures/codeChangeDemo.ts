@@ -16,7 +16,16 @@ export type Impact = {
   level: Level;
   why: string;
   evidence: string[];
+  // Who judged it: the AI check, or the keyword scan alone. Unset on samples.
+  source?: "ai" | "scan";
+  // The keyword scan's level, when the AI check changed it.
+  scanLevel?: Level;
 };
+
+// Whether the AI check ran on a change, and how it went.
+export type ReviewInfo =
+  | { status: "ai"; model: string; summary: string; withheld: number }
+  | { status: "scan-only"; reason: string };
 
 // Where the change came from. number and branch are only set for pull requests.
 export type PullRequest = { repo: string; number?: number; author: string; branch?: string; base?: string };
@@ -32,6 +41,7 @@ export type CodeChange = {
   summary: string;
   edits: Edit[];
   impacts: Impact[];
+  review?: ReviewInfo;
 };
 
 // Samples are written with one edited file inline; `changes` below converts them.
