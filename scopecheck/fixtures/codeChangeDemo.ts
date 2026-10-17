@@ -2,10 +2,15 @@
 // code changes with a hand-written impact analysis. Not real code, not a live
 // model result. Evidence is quoted text that must appear verbatim in the file.
 
+// The shared data types below are used across the whole app, not just the demo.
+
+// How badly a file is affected, from worst to harmless. Labels live in lib/levels.ts.
 export type Level = "breaks" | "update" | "check" | "safe";
 
+// One file in the project being checked. kind decides the verdict wording.
 export type ProjectFile = { path: string; kind: "code" | "test" | "doc"; code: string };
 
+// One affected file: its level, a one-line reason, and the exact lines that prove it.
 export type Impact = {
   path: string;
   level: Level;
@@ -13,10 +18,13 @@ export type Impact = {
   evidence: string[];
 };
 
+// Where the change came from. number and branch are only set for pull requests.
 export type PullRequest = { repo: string; number?: number; author: string; branch?: string; base?: string };
 
+// One edited file, as its full text before and after the change.
 export type Edit = { path: string; before: string; after: string };
 
+// Everything the main screen shows for one change: what changed and what it affects.
 export type CodeChange = {
   id: string;
   title: string;
@@ -26,6 +34,7 @@ export type CodeChange = {
   impacts: Impact[];
 };
 
+// Samples are written with one edited file inline; `changes` below converts them.
 type SampleChange = Omit<CodeChange, "edits"> & Edit;
 
 export const files: ProjectFile[] = [

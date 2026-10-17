@@ -6,6 +6,7 @@ import { analyze } from "@/lib/analyze";
 import { diffLines } from "@/lib/diff";
 import { MAX_FILES, readFolder, readPullRequest } from "@/lib/sources";
 
+// A finished analysis, plus the project's files so the page can show proof lines.
 export type Analysis = { change: CodeChange; files: ProjectFile[] };
 
 type Tab = "folder" | "github";
@@ -43,6 +44,8 @@ export function NewAnalysis({ onDone }: { onDone: (a: Analysis) => void }) {
   );
 }
 
+// Folder tab, in three steps: read a folder (lib/sources.ts), edit one file in the
+// browser, then scan that edit against the rest of the project (lib/analyze.ts).
 function FolderFlow({ onDone }: { onDone: (a: Analysis) => void }) {
   const [project, setProject] = useState<{ name: string; files: ProjectFile[]; skipped: number } | null>(null);
   const [loading, setLoading] = useState(false);
@@ -51,6 +54,7 @@ function FolderFlow({ onDone }: { onDone: (a: Analysis) => void }) {
   const [title, setTitle] = useState("");
   const [filter, setFilter] = useState("");
 
+  // The chosen file as uploaded, compared with the visitor's draft to count changed lines.
   const original = project?.files.find((f) => f.path === path)?.code ?? "";
   const changedLines = useMemo(() => diffLines(original, draft).filter((d) => d.type !== "same").length, [original, draft]);
   const shown = (project?.files ?? []).filter((f) => f.path.toLowerCase().includes(filter.toLowerCase())).slice(0, 200);
@@ -182,6 +186,8 @@ function FolderFlow({ onDone }: { onDone: (a: Analysis) => void }) {
   );
 }
 
+// GitHub tab: fetch a public pull request (lib/sources.ts), then scan it (lib/analyze.ts).
+// busy holds the current progress message while it runs.
 function GithubFlow({ onDone }: { onDone: (a: Analysis) => void }) {
   const [url, setUrl] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
@@ -236,6 +242,7 @@ function GithubFlow({ onDone }: { onDone: (a: Analysis) => void }) {
   );
 }
 
+// A numbered step with a title, used by both tabs.
 function Step({ n, title, children }: { n: number; title: string; children: React.ReactNode }) {
   return (
     <div className="flex gap-3">

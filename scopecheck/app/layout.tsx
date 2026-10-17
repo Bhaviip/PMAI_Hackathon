@@ -1,3 +1,6 @@
+// Root layout wrapping every page: loads the three fonts and the global styles.
+// The font variables are mapped to Tailwind's font-sans, font-mono and font-serif in app/globals.css.
+
 import type { Metadata } from "next";
 import { IBM_Plex_Mono, IBM_Plex_Sans, Newsreader } from "next/font/google";
 import "./globals.css";

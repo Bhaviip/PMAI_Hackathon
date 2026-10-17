@@ -1,3 +1,6 @@
+// Used in the Proof panel to show where the evidence sits in the affected file.
+
+// Lines shown around each evidence line, and the length below which a file is shown in full.
 const CONTEXT = 4;
 const SHORT_FILE = 30;
 

@@ -1,5 +1,14 @@
 "use client";
 
+// The whole app is this one page. Left sidebar: "Analyze your code" plus the list
+// of changes (yours first, then the two samples). Main area, for the chosen change:
+//   header      - pull request details, title and the overall verdict
+//   The change  - the diff of the edited files (DiffView)
+//   What it affects - the map and list of affected files (ImpactMap)
+//   Proof       - the selected file's reason and highlighted evidence lines (CodeView)
+// Choosing "Analyze your code" swaps the main area for NewAnalysis.
+// All state lives in memory, so a page refresh clears your own analyses.
+
 import { useState } from "react";
 import { changes, files, type CodeChange, type Level } from "@/fixtures/codeChangeDemo";
 import { ImpactMap } from "@/components/ImpactMap";
@@ -28,24 +37,30 @@ const countLevels = (c: CodeChange) =>
 const plural = (n: number) => `${n} file${n === 1 ? "" : "s"}`;
 
 export default function Home() {
+  // Analyses the visitor ran this session, newest first.
   const [mine, setMine] = useState<Analysis[]>([]);
   const all = [...mine, ...samples];
+  // Which change is open. null means the "Analyze your code" form is showing.
   const [changeId, setChangeId] = useState<string | null>(changes[0].id);
   const current = all.find((a) => a.change.id === changeId) ?? null;
   const change = current?.change ?? changes[0];
   const isSample = !mine.some((a) => a.change.id === change.id);
   const impacts = ordered(change);
+  // The affected file whose proof is shown, and an optional level filter from the tally.
   const [selected, setSelected] = useState<string | null>(impacts[0]?.path ?? null);
   const [focusLevel, setFocusLevel] = useState<Level | null>(null);
+  // Lookups into the project's files, used to show proof and file kinds.
   const fileByPath = new Map((current?.files ?? files).map((f) => [f.path, f]));
   const kinds = new Map((current?.files ?? files).map((f) => [f.path, f.kind]));
 
+  // Opens a change and selects its most severe affected file.
   function show(next: CodeChange) {
     setChangeId(next.id);
     setSelected(ordered(next)[0]?.path ?? null);
     setFocusLevel(null);
   }
 
+  // Called by NewAnalysis when a scan finishes.
   function added(a: Analysis) {
     setMine((m) => [a, ...m]);
     show(a.change);
@@ -55,7 +70,9 @@ export default function Home() {
   const index = impacts.findIndex((i) => i.path === selected);
   const impact = impacts[index] ?? null;
   const file = impact ? fileByPath.get(impact.path) : undefined;
+  // Proof is re-checked against the file text here; quotes that aren't found are flagged below.
   const evidence = impact && file ? locateEvidence(file.code, impact.evidence) : null;
+  // Previous / next file in the Proof panel, wrapping around at the ends.
   const step = (d: number) => impacts.length && setSelected(impacts[(index + d + impacts.length) % impacts.length].path);
 
   return (
@@ -207,6 +224,7 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
   return <h2 className="mb-3 font-serif text-[22px] font-semibold tracking-tight">{children}</h2>;
 }
 
+// One-sentence summary under the title, e.g. "2 files will break."
 function Verdict({ breaks, touched }: { breaks: number; touched: number }) {
   const [lead, color] =
     breaks > 0
@@ -269,6 +287,7 @@ function StepButton({ label, onClick, children }: { label: string; onClick: () =
   );
 }
 
+// Footer explaining how the full product would plug into GitHub (not built yet).
 const STEPS = [
   { title: "Connect a repo", body: "Install ScopeCheck on GitHub once." },
   { title: "Open a pull request", body: "ScopeCheck reads the diff and the code around it." },
@@ -291,6 +310,7 @@ function HowItWorks() {
   );
 }
 
+// A sidebar group of changes, each with a short count of what it affects.
 function ChangeList({
   title,
   items,

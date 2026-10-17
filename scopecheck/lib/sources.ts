@@ -1,11 +1,14 @@
 // Loads a project's text files from an uploaded folder or a public GitHub pull
 // request. Everything runs in the browser; nothing is sent to a ScopeCheck server.
+// Both loaders return the same shapes (ProjectFile, Edit) that lib/analyze.ts reads.
 
 import type { Edit, ProjectFile, PullRequest } from "@/fixtures/codeChangeDemo";
 import { kindOf } from "./analyze";
 
+// Limits that keep a scan fast in the browser: at most 400 files, each under 200 KB.
 export const MAX_FILES = 400;
 const MAX_BYTES = 200_000;
+// Which files count as readable project text, and which folders and files to skip.
 const TEXT_EXT =
   /\.(ts|tsx|js|jsx|mjs|cjs|py|rb|go|rs|java|kt|swift|c|h|cc|cpp|hpp|cs|php|scala|vue|svelte|css|scss|html|json|ya?ml|toml|md|mdx|txt|rst|sql|sh|graphql|proto)$/i;
 const SKIP_DIR = /(^|\/)(node_modules|\.git|\.next|dist|build|out|coverage|vendor|__pycache__|\.venv|venv|target)\//;
@@ -31,8 +34,13 @@ export async function readFolder(list: FileList): Promise<{ name: string; files:
   return { name, files, skipped: all.length - picked.length };
 }
 
+// ---- GitHub pull requests ----
+// Uses GitHub's public REST API without signing in, so only public repositories
+// work and GitHub allows about 60 requests an hour per visitor.
+
 const GH = "https://api.github.com";
 
+// Fetches JSON from the GitHub API and turns common failures into readable messages.
 async function getJson<T>(url: string): Promise<T> {
   const res = await fetch(url, { headers: { Accept: "application/vnd.github+json" } });
   if (res.status === 403 || res.status === 429) throw new Error("GitHub rate limit reached. Wait a few minutes or upload the folder instead.");
@@ -41,16 +49,19 @@ async function getJson<T>(url: string): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+// Fetches a raw file. Returns null instead of throwing, so one missing file doesn't stop the scan.
 async function getText(url: string): Promise<string | null> {
   const res = await fetch(url);
   return res.ok ? res.text() : null;
 }
 
+// Pulls owner, repo and number out of a link like https://github.com/owner/repo/pull/123.
 export function parsePrUrl(url: string) {
   const m = url.trim().match(/github\.com\/([\w.-]+)\/([\w.-]+)\/pull\/(\d+)/);
   return m ? { owner: m[1], repo: m[2], number: Number(m[3]) } : null;
 }
 
+// The parts of GitHub's API responses this file reads.
 type PrInfo = {
   title: string;
   body: string | null;
@@ -83,9 +94,11 @@ export async function readPullRequest(
   const order = [...blobs.filter((b) => changedPaths.has(b.path)), ...blobs.filter((b) => !changedPaths.has(b.path))];
   const toRead = order.slice(0, Math.min(MAX_FILES, 250));
 
+  // File contents come from raw.githubusercontent.com, which doesn't count against the API limit.
   const raw = (repo: string, sha: string, path: string) =>
     `https://raw.githubusercontent.com/${repo}/${sha}/${path.split("/").map(encodeURIComponent).join("/")}`;
 
+  // Read in batches of 20 so progress can be shown and the browser isn't flooded with requests.
   const files: ProjectFile[] = [];
   for (let i = 0; i < toRead.length; i += 20) {
     onProgress(`Reading files ${i + 1}–${Math.min(i + 20, toRead.length)} of ${toRead.length}`);
@@ -98,6 +111,8 @@ export async function readPullRequest(
     files.push(...batch.filter((f): f is ProjectFile => f !== null));
   }
 
+  // Each changed file becomes an Edit: its text at the base commit (before) and at the
+  // pull request's head commit (after). Added files have no before; removed files no after.
   onProgress("Reading the changed files");
   const byPath = new Map(files.map((f) => [f.path, f.code]));
   const headRepo = info.head.repo?.full_name ?? info.base.repo.full_name;

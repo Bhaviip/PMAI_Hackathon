@@ -11,13 +11,18 @@ type Props = {
   onSelect: (path: string) => void;
 };
 
+// Drawing size in SVG units; the SVG scales to fit its container.
 const W = 760;
 const H = 500;
+// Center point, where the changed file sits.
 const CX = W / 2;
 const CY = H / 2;
+// Size of each affected-file card.
 const NODE_W = 212;
 const NODE_H = 60;
+// More than this many cards would overlap; the rest are only in the list below the map.
 const MAX_NODES = 8;
+// Palette, matching app/globals.css (SVG attributes can't use Tailwind classes).
 const INK = "#1d1b17";
 const LINE = "#e4e0d6";
 const MUTED = "#6b665c";
